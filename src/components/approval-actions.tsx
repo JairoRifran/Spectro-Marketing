@@ -1,0 +1,4 @@
+"use client";
+import { useState } from "react";
+
+export function ApprovalActions({id,demo}:{id:string;demo:boolean}){const[state,setState]=useState<string|null>(null);async function decide(decision:"approved"|"rejected"){if(demo){setState(decision);return;}const response=await fetch(`/api/approvals/${id}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status:decision})});setState(response.ok?decision:"error");}if(state&&state!=="error")return <p className="decision-message">Solicitud {state==="approved"?"aprobada":"rechazada"}.</p>;return <div className="approval-actions"><button onClick={()=>decide("rejected")} className="secondary-button">Rechazar</button><button onClick={()=>decide("approved")} className="primary-button">Aprobar</button>{state==="error"&&<small>No se pudo guardar la decisión.</small>}</div>}

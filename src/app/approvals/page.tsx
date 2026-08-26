@@ -1,0 +1,6 @@
+import { DashboardShell } from "@/components/dashboard-shell";
+import { ApprovalActions } from "@/components/approval-actions";
+import { StatusPill,WorkspacePage } from "@/components/workspace-page";
+import { getApprovals } from "@/features/workspace/data";
+
+export default async function ApprovalsPage(){const data=await getApprovals();return <DashboardShell activePath="/approvals" organizationName={data.orgName} demo={data.mode==="demo"}><WorkspacePage eyebrow="CONTROL HUMANO" title="Centro de aprobación" description="Decisiones de riesgo explicadas antes de cualquier efecto externo."><div className="approval-list">{data.items.map(item=><article className="approval-request" key={item.id}><header><div><StatusPill value={item.status}/><span className="risk-pill">RIESGO {item.risk_level.toUpperCase()}</span></div><small>{new Date(item.created_at).toLocaleString("es-UY")}</small></header><h2>{item.task_title}</h2><p>{item.reason}</p><dl className="facts"><div><dt>Propuesto por</dt><dd>{item.agent_name}</dd></div><div><dt>Impacto esperado</dt><dd>{item.expected_impact??"No especificado"}</dd></div><div><dt>Qué cambiaría</dt><dd>{JSON.stringify(item.proposed_change)}</dd></div></dl>{item.status==="requested"&&<ApprovalActions id={item.id} demo={data.mode==="demo"}/>}</article>)}</div></WorkspacePage></DashboardShell>}

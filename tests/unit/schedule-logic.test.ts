@@ -1,0 +1,3 @@
+import { describe,expect,it } from "vitest";
+import { isSupportedCron,nextOccurrence,occurrenceKey } from "@/server/schedules/cron";
+describe("schedule logic",()=>{it("accepts the documented M01 subset",()=>{expect(isSupportedCron("0 9 * * *")).toBe(true);expect(isSupportedCron("not cron")).toBe(false)});it("builds stable occurrence keys",()=>{const at=new Date("2026-08-26T12:00:00Z");expect(occurrenceKey("daily",at)).toBe("daily:1787745600")});it("calculates the next minute without drift",()=>{expect(nextOccurrence("*/1 * * * *",new Date("2026-08-26T12:00:42Z")).toISOString()).toBe("2026-08-26T12:01:00.000Z")})});

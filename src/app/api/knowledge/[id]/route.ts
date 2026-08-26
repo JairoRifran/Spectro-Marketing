@@ -1,0 +1,4 @@
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+const schema=z.object({title:z.string().min(3).max(200).optional(),content:z.string().min(5).max(20_000).optional(),type:z.enum(["company","product","persona","brand","research","competitor","campaign","customer","learning","policy","other"]).optional()});
+export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){const{id}=await params;const parsed=schema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return Response.json({error:"validation"},{status:400});const db=await createClient();const{data:{user}}=await db.auth.getUser();if(!user)return Response.json({error:"unauthorized"},{status:401});const{data,error}=await db.from("knowledge_items").update(parsed.data).eq("id",id).select("id").single();if(error)return Response.json({error:"update_failed"},{status:403});return Response.json(data);}

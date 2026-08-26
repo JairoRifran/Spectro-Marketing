@@ -1,0 +1,4 @@
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+const schema=z.object({status:z.enum(["approved","rejected"]),note:z.string().max(1000).optional()});
+export async function PATCH(request:Request,{params}:RouteContext<"/api/approvals/[id]">){const{id}=await params;const parsed=schema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return Response.json({error:"validation"},{status:400});const db=await createClient();const{data:{user}}=await db.auth.getUser();if(!user)return Response.json({error:"unauthorized"},{status:401});const{data,error}=await db.from("approvals").update({status:parsed.data.status,decision_note:parsed.data.note,decided_by:user.id}).eq("id",id).eq("status","requested").select("id,status").single();if(error)return Response.json({error:"decision_failed"},{status:403});return Response.json(data);}

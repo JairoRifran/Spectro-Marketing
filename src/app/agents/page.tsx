@@ -1,0 +1,6 @@
+import Link from "next/link";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { WorkspacePage,StatusPill } from "@/components/workspace-page";
+import { getAgents } from "@/features/workspace/data";
+
+export default async function AgentsPage(){const data=await getAgents();return <DashboardShell activePath="/agents" organizationName={data.orgName} demo={data.mode==="demo"}><WorkspacePage eyebrow="EQUIPO AUTÓNOMO" title="Agentes" description="Roles especializados, trabajo actual y límites de autonomía."><div className="roster-grid">{data.items.map(agent=><Link href={`/agents/${agent.id}`} className="roster-card" key={agent.id}><div className="roster-top"><span className="roster-avatar">{agent.display_name.slice(0,2).toUpperCase()}</span><StatusPill value={agent.current_task?"working":"idle"}/></div><h2>{agent.display_name}</h2><p>{agent.description}</p><dl><div><dt>Trabajo actual</dt><dd>{agent.current_task??"Sin trabajo asignado"}</dd></div><div><dt>Tareas hoy</dt><dd>{agent.tasks_today}</dd></div><div><dt>Autonomía</dt><dd>Nivel {agent.autonomy_level}</dd></div><div><dt>Última actividad</dt><dd>{agent.last_run_at?new Date(agent.last_run_at).toLocaleTimeString("es-UY",{hour:"2-digit",minute:"2-digit"}):"Sin actividad"}</dd></div></dl></Link>)}</div></WorkspacePage></DashboardShell>}

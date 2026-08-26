@@ -1,0 +1,3 @@
+import { describe,expect,it } from "vitest";
+import { assertTransition,canTransition,TASK_TRANSITIONS } from "@/server/tasks/state-machine";
+describe("task state machine",()=>{it("allows the execution lifecycle",()=>{expect(canTransition("draft","queued")).toBe(true);expect(canTransition("queued","running")).toBe(true);expect(canTransition("running","completed")).toBe(true)});it("rejects terminal and arbitrary transitions",()=>{expect(canTransition("completed","running")).toBe(false);expect(canTransition("draft","completed")).toBe(false);expect(()=>assertTransition("cancelled","queued")).toThrow(/Invalid task transition/)});it("defines every status exactly once",()=>{expect(Object.keys(TASK_TRANSITIONS)).toHaveLength(9)})});
