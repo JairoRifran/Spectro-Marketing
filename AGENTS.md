@@ -8,14 +8,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Spectro M01 validation
+# Spectro validation
 
 - Preserve applied migrations; add corrective migrations with a new timestamp.
 - Never run remote fixture cleanup unless `TEST_ENVIRONMENT=true`, and never against production.
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-only and autonomous execution disabled by default.
-- Before M01 closeout run lint, typecheck, unit/integration tests, build, and Playwright; PASS requires real Supabase, Vercel, and Cron evidence.
+- Before milestone closeout run lint, typecheck, unit/integration tests, build, and Playwright; PASS requires real Supabase and Vercel evidence. Cron must remain inactive for M02.1.
 
-# Spectro M01 engineering guide
+# Spectro engineering guide
 
 Spectro is a multi-tenant marketing operating system. PostgreSQL is the source of truth. Autonomous behavior uses persistent events, schedules, tasks, short workers, leases, retries, and idempotency—not permanent Node processes. The bounded Vercel dispatcher is awakened externally.
 
@@ -36,6 +36,14 @@ Migrations in `supabase/migrations` are forward-only after production use. Test 
 - Provider: implement `AgentProvider` and map failures to typed errors; never invent vendor APIs.
 - Task type: add a namespaced type, input/output validation, risk policy, handler behavior, and tests.
 
+## Campaign Brain boundaries
+
+- Campaign Brain starts from an Objective and ends at a versioned Campaign Brief; it does not produce or publish social posts.
+- `Run Campaign Brain` is an explicit authenticated action. It may reuse the task runtime while `AUTOMATION_ENABLED=false`; it must never claim unrelated queued work.
+- Brand forbidden words/claims are validated deterministically before `ready`. Research must identify `knowledge_based` versus `external` and expose assumptions and external research gaps.
+- Prompt definitions live under `src/server/campaigns`, provider outputs are validated with Zod, and mock results must remain clearly distinguishable from real-provider output.
+- Every campaign artifact keeps `organization_id`, `campaign_id`, `strategy_version`, RLS and an audited activity trail.
+
 ## Done
 
-RLS/idempotency remain intact; migrations are forward-only; relevant tests exist; lint, typecheck, tests, and build pass; docs and `.env.example` stay accurate; no secrets or fabricated live metrics exist. Preserve demo/live separation. Real publishing, spend, and external marketing integrations are outside M01.
+RLS/idempotency remain intact; migrations are forward-only; relevant tests exist; lint, typecheck, tests, and build pass; docs and `.env.example` stay accurate; no secrets or fabricated live metrics exist. Preserve demo/live separation. Real publishing, spend, external marketing integrations, and the Content Factory are outside M02.1.

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bot, Check, ChevronRight, CircleAlert, Clock3, Ellipsis, ShieldCheck, Sparkles, Target, TrendingUp } from "lucide-react";
+import { ArrowRight, Bot, Check, ChevronRight, CircleAlert, Clock3, Ellipsis, Megaphone, ShieldCheck, Sparkles, Target, TrendingUp } from "lucide-react";
 import type { HqData } from "@/features/dashboard/data";
 import { relativeTime } from "@/features/dashboard/data";
 
@@ -16,6 +16,7 @@ export function MarketingHQ({data}:{data:HqData}) {
       <section><div className="section-heading"><div><span>AGENTES</span><h2>Equipo en operación</h2></div><Link href="/agents">Ver equipo <ArrowRight size={15}/></Link></div>
         {data.agents.length?<div className="agent-grid">{data.agents.slice(0,4).map(agent=><Link href={`/agents/${agent.id}`} className="agent-card" key={agent.id}><div className={`agent-avatar ${agent.tone}`}>{agent.initials}<span className={agent.state.toLowerCase()}/></div><div className="agent-main"><h3>{agent.name}</h3><p>{agent.role}</p></div><span className={`state-pill ${agent.state.toLowerCase()}`}>{agent.state}</span><div className="agent-task"><small>AHORA</small><p>{agent.task}</p></div><ChevronRight className="agent-chevron" size={17}/></Link>)}</div>:<EmptyState text="Los agentes aparecerán al completar el onboarding."/>}
       </section>
+      <section><div className="section-heading"><div><span>CAMPAIGN BRAIN</span><h2>Campañas estratégicas</h2></div><Link href="/campaigns">Abrir campañas <ArrowRight size={15}/></Link></div><div className="campaign-hq-summary"><Metric icon={<Megaphone size={17}/>} tone="active" value={data.campaigns.active} label="Activas"/><Metric icon={<Sparkles size={17}/>} tone="muted" value={data.campaigns.developing} label="En desarrollo"/><Metric icon={<ShieldCheck size={17}/>} tone="warning" value={data.campaigns.waitingApproval} label="Esperando decisión"/></div></section>
       <section><div className="section-heading"><div><span>TRABAJO AUTÓNOMO</span><h2>Flujo de hoy</h2></div><Link href="/tasks">Ver todo <ArrowRight size={15}/></Link></div><div className="work-summary"><Metric icon={<Check size={17}/>} tone="success" value={data.counts.completed} label="Completadas"/><Metric icon={<Bot size={17}/>} tone="active" value={data.counts.running} label="Ejecutando"/><Metric icon={<Clock3 size={17}/>} tone="muted" value={data.counts.queued} label="En cola"/><Metric icon={<ShieldCheck size={17}/>} tone="warning" value={data.counts.approval} label="Aprobación"/><Metric icon={<CircleAlert size={17}/>} tone="danger" value={data.counts.failed} label="Fallidas"/></div></section>
     </div><aside className="attention-column">
       <section><div className="section-heading compact"><div><span>NECESITA TU ATENCIÓN</span><h2>Decisiones pendientes</h2></div><b className="count-badge">{data.counts.approval}</b></div>

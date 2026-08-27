@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Settings2 } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Megaphone, Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { getPendingApprovalCount } from "@/features/approvals/count";
 import { getOrganizationContext } from "@/features/organizations/context";
@@ -9,6 +9,7 @@ const primaryNav = [
   { href: "/", label: "Marketing HQ", icon: Gauge },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/tasks", label: "Trabajo", icon: CheckSquare2 },
+  { href: "/campaigns", label: "Campañas", icon: Megaphone },
   { href: "/approvals", label: "Aprobaciones", icon: Command },
   { href: "/knowledge", label: "Conocimiento", icon: BrainCircuit },
 ];

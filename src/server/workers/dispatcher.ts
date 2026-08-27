@@ -7,10 +7,12 @@ import { getAgentProvider } from "@/server/agents/provider";
 import type { RuntimeTask } from "@/server/tasks/types";
 import { retryDecision } from "@/server/tasks/retry";
 import { executionAllowed } from "@/server/policies/execution";
+import { persistCampaignOutcome } from "@/server/campaigns/outcomes";
 
 type AgentRow = { id: string; organization_id: string; role: string; display_name: string; autonomy_level: 0|1|2|3; configuration: Record<string,unknown> };
 
 export interface DispatchReport { workerId: string; schedules: number; events: number; claimed: number; completed: number; retried: number; failed: number; queued: number; running: number; staleLeases: number; }
+export interface ManualCampaignReport { workerId:string; claimed:number; completed:number; retried:number; failed:number; }
 
 export async function dispatch(options: { workerId: string; batchSize: number; leaseSeconds: number }): Promise<DispatchReport> {
   const db = createAdminClient();
@@ -76,16 +78,18 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
 
   log("info", "task.started", { organizationId: task.organization_id, taskId: task.id, agentId: agent.id, runId: agentRun.id, eventId: task.source_event_id ?? undefined, correlationId });
   try {
+    const startedAt=Date.now();
     const result = await getAgentProvider().run({ organizationId: task.organization_id, agent: { id: agent.id, role: agent.role, displayName: agent.display_name, autonomyLevel: agent.autonomy_level, configuration: agent.configuration }, task, correlationId });
+    await persistCampaignOutcome(db,task,result,agent);
     const completedAt = new Date().toISOString();
     const { data: completedTask, error: completionError } = await db.from("tasks").update({ status: "completed", output: result.output }).eq("id", task.id).eq("locked_by", workerId).eq("status", "running").select("id").maybeSingle();
     if (completionError || !completedTask) throw Object.assign(new Error("Task lease was lost before completion"), { retryable: true });
     await persistDelegatedTasks(db, task, result.delegatedTasks ?? []);
     await Promise.all([
       db.from("task_runs").update({ status: "completed", output: result.output, completed_at: completedAt }).eq("id", taskRun.id),
-      db.from("agent_runs").update({ status: "completed", output: result.output, completed_at: completedAt }).eq("id", agentRun.id),
+      db.from("agent_runs").update({ status: "completed", output: result.output, completed_at: completedAt, model: typeof result.output.model==="string"?result.output.model:null, prompt_version:typeof result.output.promptVersion==="string"?result.output.promptVersion:null, latency_ms:Date.now()-startedAt }).eq("id", agentRun.id),
       db.from("agents").update({ last_run_at: completedAt }).eq("id", agent.id),
-      db.from("activity_log").insert({ organization_id: task.organization_id, action: "task.completed", actor_type: "agent", actor_id: agent.id, entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: agent.id, event_id: task.source_event_id, run_id: agentRun.id, summary: result.summary, metadata: { provider: process.env.AI_PROVIDER ?? "mock", correlation_id: correlationId } }),
+      db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: "task.completed", actor_type: "agent", actor_id: agent.id, entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: agent.id, event_id: task.source_event_id, run_id: agentRun.id, summary: result.summary, metadata: { provider: process.env.AI_PROVIDER ?? "mock", correlation_id: correlationId } }),
     ]);
     return "completed";
   } catch (error) {
@@ -99,7 +103,7 @@ async function persistDelegatedTasks(db: SupabaseClient, parent: RuntimeTask, de
     const item = delegated[index];
     const { data: agent } = await db.from("agents").select("id").eq("organization_id", parent.organization_id).eq("role", item.role).single();
     const key = `parent:${parent.id}:delegated:${index}:${item.type}`;
-    const { data: child } = await db.from("tasks").upsert({ organization_id: parent.organization_id, title: item.title, description: item.description, type: item.type, status: "queued", priority: "medium", created_by_type: "agent", created_by_id: parent.assigned_agent_id, assigned_agent_id: agent?.id, objective_id: parent.objective_id, parent_task_id: parent.id, reason: item.reason, idempotency_key: key, input: item.input }, { onConflict: "organization_id,idempotency_key" }).select("id").single();
+    const { data: child } = await db.from("tasks").upsert({ organization_id: parent.organization_id, campaign_id:parent.campaign_id, title: item.title, description: item.description, type: item.type, status: "queued", priority: "medium", created_by_type: "agent", created_by_id: parent.assigned_agent_id, assigned_agent_id: agent?.id, objective_id: parent.objective_id, parent_task_id: parent.id, reason: item.reason, idempotency_key: key, input: item.input }, { onConflict: "organization_id,idempotency_key" }).select("id").single();
     if (child) await db.from("task_dependencies").upsert({ organization_id: parent.organization_id, task_id: child.id, depends_on_task_id: parent.id, required: true }, { onConflict: "task_id,depends_on_task_id", ignoreDuplicates: true });
   }
 }
@@ -110,8 +114,21 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
   const details = publicError(error);
   if (taskRunId) await db.from("task_runs").update({ status: "failed", error: details, completed_at: new Date().toISOString() }).eq("id", taskRunId);
   await db.from("tasks").update(decision.retry ? { status: "queued", scheduled_for: new Date(Date.now() + decision.delayMs).toISOString(), error: details, locked_at: null, locked_by: null, lease_expires_at: null } : { status: "failed", error: details }).eq("id", task.id).eq("locked_by", workerId);
-  await db.from("activity_log").insert({ organization_id: task.organization_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: decision.delayMs } });
+  await db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: decision.delayMs } });
   return decision.retry ? "retried" : "failed";
+}
+
+export async function runManualCampaignTasks(options:{campaignId:string;maxSteps:number;leaseSeconds:number}):Promise<ManualCampaignReport>{
+  const db=createAdminClient();const workerId=`manual-campaign:${options.campaignId}:${crypto.randomUUID()}`;
+  const report:ManualCampaignReport={workerId,claimed:0,completed:0,retried:0,failed:0};
+  for(let step=0;step<options.maxSteps;step+=1){
+    const{data,error}=await db.rpc("claim_campaign_task",{p_campaign_id:options.campaignId,p_worker_id:workerId,p_lease_seconds:options.leaseSeconds});
+    if(error)throw new Error(`Campaign task claim failed: ${error.code}`);
+    const task=(data?.[0]??null) as RuntimeTask|null;if(!task)break;
+    report.claimed+=1;const outcome=await executeTask(db,task,workerId);report[outcome]+=1;
+    if(outcome!=="completed")break;
+  }
+  return report;
 }
 
 async function updateWorkerHealth(db: SupabaseClient, report: DispatchReport) {
