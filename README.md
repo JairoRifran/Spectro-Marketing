@@ -27,4 +27,4 @@ Autonomous execution is disabled by default. `AUTOMATION_ENABLED=true` enables i
 
 Campaign Brain is invoked only by an authenticated human action. Its manual runner reuses the task runtime but claims only tasks related to the selected campaign. It does not require Cron and never publishes, schedules social posts, spends budget or calls social APIs. With `AI_PROVIDER=mock`, its output is deterministic and labeled as mock-derived.
 
-See [Campaign Brain](docs/campaign-brain.md), [architecture](docs/architecture.md), [agent runtime](docs/agent-runtime.md), [task engine](docs/task-engine.md), [approvals](docs/approvals.md), [security](docs/security.md), [deployment](docs/deployment.md), and [M02.1 closeout](docs/m02-1-closeout.md).
+See [Campaign Brain](docs/campaign-brain.md), [architecture](docs/architecture.md), [agent runtime](docs/agent-runtime.md), [task engine](docs/task-engine.md), [approvals](docs/approvals.md), [security](docs/security.md), [deployment](docs/deployment.md), [M02.1 closeout](docs/m02-1-closeout.md), [Content Factory](docs/content-factory.md), and [M02.2B closeout](docs/m02-2b-closeout.md).

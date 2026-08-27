@@ -184,25 +184,21 @@ end $$;
 create trigger enforce_content_transition before update of status on public.content_items for each row execute function public.enforce_content_transition();
 
 -- Human decisions on a content approval land on the item through the M01 approval engine.
--- Requesting a revision is expressed as a rejection carrying a decision note, which is how the
--- existing approvals surface can drive all three outcomes without a second approval system.
+-- The mapping is deliberately literal: approved means approved and rejected means rejected.
+-- "Request revision" is not inferred from the shape of a note; it is a separate, explicit step
+-- the application takes afterwards, moving the piece from rejected to needs_revision and
+-- creating the next version. Guessing intent from an empty string would be a silent behaviour.
 create or replace function public.apply_content_approval() returns trigger language plpgsql security definer set search_path=public as $$
 declare next_status public.content_status; begin
   if new.content_item_id is null or old.status <> 'requested' or new.status not in ('approved','rejected') then return new; end if;
-  if new.status = 'approved' then
-    next_status := 'approved';
-    update public.content_items set status=next_status, approved_at=now() where id=new.content_item_id and status='waiting_approval';
-  else
-    next_status := case when coalesce(new.decision_note,'') <> '' then 'needs_revision'::public.content_status else 'rejected'::public.content_status end;
-    update public.content_items set status=next_status where id=new.content_item_id and status='waiting_approval';
-  end if;
+  next_status := case when new.status = 'approved' then 'approved'::public.content_status else 'rejected'::public.content_status end;
+  update public.content_items
+    set status = next_status,
+        approved_at = case when next_status = 'approved' then now() else approved_at end
+    where id = new.content_item_id and status = 'waiting_approval';
   insert into public.activity_log(organization_id,campaign_id,content_item_id,action,actor_type,actor_id,entity_type,entity_id,task_id,summary,metadata)
     values(new.organization_id,new.campaign_id,new.content_item_id,'content.'||next_status::text,'user',new.decided_by,'content_item',new.content_item_id,new.task_id,
-      case next_status
-        when 'approved' then 'Contenido aprobado por una persona'
-        when 'needs_revision' then 'Se pidió una revisión del contenido'
-        else 'Contenido rechazado'
-      end,
+      case when next_status = 'approved' then 'Contenido aprobado por una persona' else 'Contenido rechazado por una persona' end,
       jsonb_build_object('decision_note',new.decision_note));
   return new;
 end $$;
