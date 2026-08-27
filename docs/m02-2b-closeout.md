@@ -67,6 +67,34 @@ main branch          untouched
 The factory has no scheduled entry point. Its only trigger is an authenticated, authorised human
 action that first verifies the campaign strategy was approved.
 
+## Integration record (2026-08-27)
+
+- Fast-forward merge of `claude/m02-content-factory` into `main`; zero divergence, no conflicts.
+- Commits `f4abba1` and `111c14f`; pushed `6b804b3..111c14f`.
+- Vercel deployment for `111c14f` reached **Ready** in Production, confirmed on the deployments
+  list rather than assumed from the push.
+- `GET /api/health` returned HTTP 200 with `app=true` and `database=true` after the deploy.
+- `POST /api/internal/jobs/dispatch` still answers `503 automation_disabled`.
+- Changes to files shared with the Campaign Brain work total eight additive lines across
+  `dashboard-shell`, `app/page`, `dispatcher` and `mock-provider`, plus six in the campaign detail.
+
+## Migration review (not applied)
+
+`202608270005` was reviewed line by line before hand-off:
+
+- No `drop`, `delete`, `truncate` or column removal anywhere; the single `update` is inside the
+  `apply_content_approval` trigger body, not a data migration.
+- Three added columns (`tasks`, `approvals`, `activity_log`), all nullable UUID foreign keys with
+  `on delete set null`, so existing rows are untouched.
+- RLS enabled with a member-read policy on all five new tables.
+- Eleven triggers: lifecycle enforcement, cross-organization reference guards and the approval
+  integration.
+- No `concurrently`, `vacuum` or `reindex`, so the whole file can run inside one transaction.
+- The file is 100% ASCII, so no clipboard or codepage can corrupt it in transit.
+
+It was not applied because this host has no Supabase CLI, no `psql` and no Docker, and driving the
+SQL Editor through browser automation is forbidden after the earlier incident.
+
 ## Next step
 
 One integration pass: merge review, apply `202608270005` to production using the transactional
