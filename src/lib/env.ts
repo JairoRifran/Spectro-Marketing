@@ -21,8 +21,13 @@ const runtimeSchema = z.object({
   VERCEL_ENV: z.preprocess(emptyAsUndefined,z.enum(["development", "preview", "production"]).optional()),
 });
 
+// Next.js inlines only static `process.env.NEXT_PUBLIC_*` references; passing
+// `process.env` itself leaves these undefined in the browser bundle.
 export function getPublicEnv() {
-  return publicSchema.parse(process.env);
+  return publicSchema.parse({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  });
 }
 
 export function getServerEnv() {
