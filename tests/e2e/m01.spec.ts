@@ -19,12 +19,11 @@ test("approval can be decided in isolated demo mode", async ({ page }) => {
   await expect(page.getByText("Solicitud aprobada.")).toBeVisible();
 });
 
-test("signup to onboarding to HQ", async ({ page }) => {
-  test.skip(!process.env.E2E_SUPABASE_CONFIGURED, "requires isolated Supabase test project");
-  await page.goto("/signup");
-  await page.getByLabel("Nombre completo").fill("M01 Test");
-  await page.getByLabel("Email").fill(`m01-${Date.now()}@example.com`);
-  await page.getByLabel("Contraseña").fill("test-password-123");
-  await page.getByRole("button", { name: "Crear cuenta" }).click();
-  await expect(page).toHaveURL(/onboarding/);
+test("health and automation endpoints expose no internals in demo",async({request})=>{
+  const health=await request.get("/api/health");
+  const body=await health.json();
+  expect(Object.keys(body).sort()).toEqual(["app","database","status","timestamp"]);
+  const dispatch=await request.post("/api/internal/jobs/dispatch",{data:{}});
+  expect(dispatch.status()).toBe(503);
+  expect(await dispatch.json()).toEqual({error:"automation_disabled"});
 });

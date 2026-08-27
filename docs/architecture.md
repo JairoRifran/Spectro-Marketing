@@ -1,6 +1,6 @@
 # Architecture
 
-M01 uses Next.js App Router on Vercel and Supabase for Auth, Postgres, Storage, and future Realtime. Server Components read user-scoped data through RLS. Route Handlers validate mutations with Zod. Only the internal dispatcher uses the service role.
+M01 uses Next.js App Router on Vercel and Supabase for Auth, Postgres, Storage, and future Realtime. Server Components read user-scoped data through RLS. An HttpOnly organization-context cookie selects one of the authenticated user's memberships and is revalidated on every request. Route Handlers validate mutations with Zod. Only the internal dispatcher uses the service role.
 
 ```mermaid
 flowchart TD
@@ -23,3 +23,5 @@ flowchart TD
 ```
 
 PostgreSQL owns state; workers are bounded; locks prevent duplicate claims; unique organization-scoped keys prevent duplicate intent; leases repair interrupted work; approvals and autonomy are deterministic; providers cannot override policy.
+
+M01.1 adds defense in depth: sensitive configuration writes are owner/admin-only, notification rows are user-private, cross-organization foreign references are rejected by triggers, approval decisions use an audited RPC, and the last owner cannot be removed. `AUTOMATION_ENABLED` is a server-only kill switch; preview and test environments remain disabled even if the flag is accidentally true.

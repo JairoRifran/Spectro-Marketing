@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, ChevronDown, Command, Gauge, Settings2 } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { getOrganizationContext } from "@/features/organizations/context";
+import { automationIsEnabled } from "@/lib/env";
 
 const primaryNav = [
   { href: "/", label: "Marketing HQ", icon: Gauge },
@@ -15,7 +17,9 @@ const settingsNav = [
   { href: "/settings/automation", label: "Automatización", icon: Settings2 },
 ];
 
-export function DashboardShell({ children, activePath, organizationName="Northstar Urban", demo=true }: { children: ReactNode; activePath: string; organizationName?: string; demo?: boolean }) {
+export async function DashboardShell({ children, activePath, organizationName="Northstar Urban", demo=true }: { children: ReactNode; activePath: string; organizationName?: string; demo?: boolean }) {
+  const context = demo ? null : await getOrganizationContext();
+  const automationEnabled = automationIsEnabled();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -23,11 +27,17 @@ export function DashboardShell({ children, activePath, organizationName="Northst
           <span className="brand-icon"><Activity size={18} /></span>
           <span><strong>SPECTRO</strong><small>MARKETING OS</small></span>
         </Link>
-        <button className="org-switcher" type="button" aria-label="Cambiar organización">
-          <span className="org-avatar">NU</span>
-          <span><strong>{organizationName}</strong><small>{demo ? "Datos de demostración" : "Workspace principal"}</small></span>
-          <ChevronDown size={16} />
-        </button>
+        {context && context.organizations.length > 1 ? <form className="org-switcher org-switcher-form" action="/api/organizations/select" method="post">
+          <span className="org-avatar">{organizationName.slice(0,2).toUpperCase()}</span>
+          <input type="hidden" name="next" value={activePath}/>
+          <select name="organization_id" defaultValue={context.orgId} aria-label="Cambiar organización">
+            {context.organizations.map(organization=><option value={organization.id} key={organization.id}>{organization.name}</option>)}
+          </select>
+          <button type="submit">Cambiar</button>
+        </form> : <div className="org-switcher">
+          <span className="org-avatar">{organizationName.slice(0,2).toUpperCase()}</span>
+          <span><strong>{organizationName}</strong><small>{demo ? "Datos de demostración" : context?.role ?? "Workspace"}</small></span>
+        </div>}
         <nav aria-label="Navegación principal">
           <p className="nav-label">OPERACIONES</p>
           {primaryNav.map((item) => (
@@ -43,8 +53,9 @@ export function DashboardShell({ children, activePath, organizationName="Northst
           ))}
         </nav>
         <div className="sidebar-status">
-          <div><span className="pulse-dot" /><strong>Sistema operativo</strong></div>
-          <p>Worker activo · hace 42 s</p>
+          <div><span className={automationEnabled?"pulse-dot":"offline-dot"} /><strong>{automationEnabled?"Automatización activa":"Automatización detenida"}</strong></div>
+          <p>{demo?"Entorno demo explícito":automationEnabled?"Kill switch habilitado":"AUTOMATION_ENABLED=false"}</p>
+          {!demo&&<form action="/api/auth/logout" method="post"><button className="logout-button" type="submit"><LogOut size={13}/>Cerrar sesión</button></form>}
         </div>
       </aside>
       <main className="main-stage">{children}</main>

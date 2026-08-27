@@ -13,12 +13,27 @@ const serverSchema = publicSchema.extend({
   TASK_LEASE_SECONDS: z.coerce.number().int().min(15).max(900).default(120),
 });
 
+const runtimeSchema = z.object({
+  AUTOMATION_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  DEPLOYMENT_ENVIRONMENT: z.enum(["development", "preview", "production", "test"]).default("development"),
+  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+});
+
 export function getPublicEnv() {
   return publicSchema.parse(process.env);
 }
 
 export function getServerEnv() {
-  return serverSchema.parse(process.env);
+  return serverSchema.merge(runtimeSchema).parse(process.env);
+}
+
+export function getRuntimeEnv() { return runtimeSchema.parse(process.env); }
+
+export function automationIsEnabled() {
+  const env = getRuntimeEnv();
+  const environment = env.VERCEL_ENV ?? env.DEPLOYMENT_ENVIRONMENT;
+  return env.AUTOMATION_ENABLED && environment !== "preview" && environment !== "test";
 }
 
 export const isDemoMode = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+export const isSupabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);

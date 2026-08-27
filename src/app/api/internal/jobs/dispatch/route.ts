@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { dispatch } from "@/server/workers/dispatcher";
-import { getServerEnv } from "@/lib/env";
+import { automationIsEnabled, getServerEnv } from "@/lib/env";
 import { log } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
@@ -15,6 +15,7 @@ function validSecret(received: string | null, expected: string) {
 }
 
 export async function POST(request: Request) {
+  if (!automationIsEnabled()) return Response.json({ error: "automation_disabled" }, { status: 503 });
   const env = getServerEnv();
   const auth = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? request.headers.get("x-cron-secret");
   if (!validSecret(auth, env.CRON_SECRET)) return Response.json({ error: "unauthorized" }, { status: 401 });

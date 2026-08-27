@@ -6,14 +6,15 @@ import { eventToTask, type PersistentEvent } from "@/server/events/handler";
 import { getAgentProvider } from "@/server/agents/provider";
 import type { RuntimeTask } from "@/server/tasks/types";
 import { retryDecision } from "@/server/tasks/retry";
+import { executionAllowed } from "@/server/policies/execution";
 
 type AgentRow = { id: string; organization_id: string; role: string; display_name: string; autonomy_level: 0|1|2|3; configuration: Record<string,unknown> };
 
-export interface DispatchReport { workerId: string; schedules: number; events: number; claimed: number; completed: number; retried: number; failed: number; }
+export interface DispatchReport { workerId: string; schedules: number; events: number; claimed: number; completed: number; retried: number; failed: number; queued: number; running: number; staleLeases: number; }
 
 export async function dispatch(options: { workerId: string; batchSize: number; leaseSeconds: number }): Promise<DispatchReport> {
   const db = createAdminClient();
-  const report: DispatchReport = { workerId: options.workerId, schedules: 0, events: 0, claimed: 0, completed: 0, retried: 0, failed: 0 };
+  const report: DispatchReport = { workerId: options.workerId, schedules: 0, events: 0, claimed: 0, completed: 0, retried: 0, failed: 0, queued: 0, running: 0, staleLeases: 0 };
   const { data: schedules, error: scheduleError } = await db.rpc("materialize_due_schedules", { p_limit: options.batchSize });
   if (scheduleError) log("error", "schedule.materialization_failed", {}, { code: scheduleError.code });
   report.schedules = schedules?.length ?? 0;
@@ -62,6 +63,11 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
     : { data: null, error: null };
   if (agentError || !agentData) return finishFailure(db, task, workerId, new Error("Assigned agent not found"));
   const agent = agentData as AgentRow;
+  const { data: approved } = task.requires_approval
+    ? await db.from("approvals").select("id").eq("task_id",task.id).eq("status","approved").limit(1).maybeSingle()
+    : { data: null };
+  if(!executionAllowed({autonomyLevel:agent.autonomy_level,riskLevel:task.risk_level,requiresApproval:task.requires_approval,hasApproval:Boolean(approved)}))
+    return finishFailure(db,task,workerId,new Error("Autonomy policy denied execution"));
   const runKey = `task:${task.id}:attempt:${task.attempt_count}`;
   const { data: taskRun, error: taskRunError } = await db.from("task_runs").insert({ organization_id: task.organization_id, task_id: task.id, agent_id: agent.id, attempt_number: task.attempt_count, worker_id: workerId, status: "running", input: task.input, correlation_id: correlationId }).select("id").single();
   if (taskRunError) return finishFailure(db, task, workerId, new Error(taskRunError.code));
@@ -110,5 +116,11 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
 
 async function updateWorkerHealth(db: SupabaseClient, report: DispatchReport) {
   const now = new Date().toISOString();
+  const [queued,running,stale]=await Promise.all([
+    db.from("tasks").select("id",{count:"exact",head:true}).eq("status","queued"),
+    db.from("tasks").select("id",{count:"exact",head:true}).eq("status","running"),
+    db.from("tasks").select("id",{count:"exact",head:true}).eq("status","running").lt("lease_expires_at",now),
+  ]);
+  report.queued=queued.count??0;report.running=running.count??0;report.staleLeases=stale.count??0;
   await db.from("worker_health").upsert({ worker_name: "dispatcher", last_dispatch_at: now, last_successful_run_at: report.failed === 0 ? now : undefined, last_failed_run_at: report.failed > 0 ? now : undefined, metadata: report }, { onConflict: "worker_name" });
 }

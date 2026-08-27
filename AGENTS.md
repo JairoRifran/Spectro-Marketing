@@ -8,6 +8,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Spectro M01 validation
+
+- Preserve applied migrations; add corrective migrations with a new timestamp.
+- Never run remote fixture cleanup unless `TEST_ENVIRONMENT=true`, and never against production.
+- Keep `SUPABASE_SERVICE_ROLE_KEY` server-only and autonomous execution disabled by default.
+- Before M01 closeout run lint, typecheck, unit/integration tests, build, and Playwright; PASS requires real Supabase, Vercel, and Cron evidence.
+
 # Spectro M01 engineering guide
 
 Spectro is a multi-tenant marketing operating system. PostgreSQL is the source of truth. Autonomous behavior uses persistent events, schedules, tasks, short workers, leases, retries, and idempotency—not permanent Node processes. The bounded Vercel dispatcher is awakened externally.

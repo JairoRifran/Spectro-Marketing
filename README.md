@@ -21,6 +21,8 @@ pnpm build
 pnpm test:e2e
 ```
 
-Postgres integration tests require `SUPABASE_TEST_URL` and `SUPABASE_TEST_SERVICE_KEY` for an isolated project. Auth E2E requires `E2E_SUPABASE_CONFIGURED=1`.
+Remote tests require an isolated migrated Supabase project, all `SUPABASE_TEST_*` variables, and the explicit destructive-test guard `TEST_ENVIRONMENT=true`. They refuse production environments. Live Playwright additionally requires the app Supabase variables to point to that same test project and `AUTOMATION_ENABLED=true`.
 
-See [architecture](docs/architecture.md), [agent runtime](docs/agent-runtime.md), [task engine](docs/task-engine.md), [event engine](docs/event-engine.md), [approvals](docs/approvals.md), [security](docs/security.md), [deployment](docs/deployment.md), and [closeout](docs/m01-closeout.md).
+Autonomous execution is disabled by default. `AUTOMATION_ENABLED=true` enables it only outside preview/test environments; Vercel Preview is always blocked. `/api/health` exposes only app/database readiness. See [production validation](docs/production-validation.md) for the repeatable closeout procedure.
+
+See [architecture](docs/architecture.md), [agent runtime](docs/agent-runtime.md), [task engine](docs/task-engine.md), [event engine](docs/event-engine.md), [approvals](docs/approvals.md), [security](docs/security.md), [deployment](docs/deployment.md), [production validation](docs/production-validation.md), and [closeout](docs/m01-closeout.md).

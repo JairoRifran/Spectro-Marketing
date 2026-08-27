@@ -1,0 +1,10 @@
+import {afterEach,describe,expect,it} from "vitest";
+import {automationIsEnabled} from "@/lib/env";
+
+const original={...process.env};
+afterEach(()=>{process.env={...original};});
+describe("automation environment guard",()=>{
+  it("defaults to disabled",()=>{delete process.env.AUTOMATION_ENABLED;expect(automationIsEnabled()).toBe(false)});
+  it("never runs in preview",()=>{process.env.AUTOMATION_ENABLED="true";process.env.VERCEL_ENV="preview";expect(automationIsEnabled()).toBe(false)});
+  it("requires explicit enablement outside preview/test",()=>{process.env.AUTOMATION_ENABLED="true";process.env.VERCEL_ENV="production";expect(automationIsEnabled()).toBe(true)});
+});

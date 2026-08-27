@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/features/organizations/context";
 import { isDemoMode } from "@/lib/env";
 
 export type HqAgent = { id:string; initials:string; name:string; role:string; state:"Working"|"Queued"|"Idle"; task:string; tone:string };
@@ -27,14 +27,11 @@ const demoData: HqData = {
 };
 
 export async function getHqData(): Promise<HqData> {
-  if (isDemoMode || !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return demoData;
-  const db = await createClient();
-  const { data:{ user } } = await db.auth.getUser();
+  if (isDemoMode) return demoData;
   const empty: HqData = { ...demoData, mode:"live", organizationName:"Sin organización", objective:null, agents:[], counts:{completed:0,running:0,queued:0,approval:0,failed:0}, approval:null, activity:[], health:{healthy:false,lastDispatch:null} };
-  if (!user) return empty;
-  const { data:membership } = await db.from("organization_members").select("organization_id,organizations(name)").eq("user_id",user.id).limit(1).maybeSingle();
-  if (!membership) return empty;
-  const orgId=membership.organization_id;
+  const context = await getOrganizationContext();
+  if (!context) return empty;
+  const { db, orgId } = context;
   const [objectiveResult,agentsResult,tasksResult,approvalResult,activityResult,healthResult] = await Promise.all([
     db.from("objectives").select("title,metric,baseline,target,market,priority,deadline").eq("organization_id",orgId).eq("status","active").order("created_at",{ascending:false}).limit(1).maybeSingle(),
     db.from("agents").select("id,display_name,description,role").eq("organization_id",orgId).eq("status","active").order("display_name").limit(8),
@@ -45,9 +42,11 @@ export async function getHqData(): Promise<HqData> {
   ]);
   const tasks=tasksResult.data ?? []; const tones=["coral","blue","violet","green"];
   const agents=(agentsResult.data ?? []).map((agent,index) => { const current=tasks.find(task=>task.assigned_agent_id===agent.id&&task.status==="running")??tasks.find(task=>task.assigned_agent_id===agent.id&&task.status==="queued"); return {id:agent.id,initials:agent.display_name.slice(0,2).toUpperCase(),name:agent.display_name,role:agent.description??agent.role,state:(current?.status==="running"?"Working":current?"Queued":"Idle") as HqAgent["state"],task:current?.title??"Sin trabajo asignado",tone:tones[index%tones.length]}; });
-  const approvalTask=approvalResult.data?.tasks as unknown as {title:string;assigned_agent_id:string|null}|null; const proposer=agents.find(agent=>agent.id===approvalTask?.assigned_agent_id); const orgRelation=membership.organizations as unknown as {name:string}|null;
+  const approvalTask=approvalResult.data?.tasks as unknown as {title:string;assigned_agent_id:string|null}|null; const proposer=agents.find(agent=>agent.id===approvalTask?.assigned_agent_id);
   const objective=objectiveResult.data?{...objectiveResult.data,baseline:objectiveResult.data.baseline===null?null:Number(objectiveResult.data.baseline),target:Number(objectiveResult.data.target)}:null;
-  return {mode:"live",organizationName:orgRelation?.name??"Organización",objective,agents,counts:{completed:tasks.filter(t=>t.status==="completed").length,running:tasks.filter(t=>t.status==="running").length,queued:tasks.filter(t=>t.status==="queued").length,approval:approvalResult.data?1:0,failed:tasks.filter(t=>t.status==="failed").length},approval:approvalResult.data?{id:approvalResult.data.id,title:approvalTask?.title??"Solicitud de aprobación",reason:approvalResult.data.reason,risk:approvalResult.data.risk_level,agentName:proposer?.name??"Agente",agentRole:proposer?.role??"Equipo"}:null,activity:(activityResult.data??[]).map(item=>({id:item.id,summary:item.summary,action:item.action,createdAt:item.created_at})),health:{healthy:Boolean(healthResult.data?.last_dispatch_at),lastDispatch:healthResult.data?.last_dispatch_at??null}};
+  const lastDispatch=healthResult.data?.last_dispatch_at??null;
+  const healthy=Boolean(lastDispatch && Date.now()-new Date(lastDispatch).getTime()<5*60_000);
+  return {mode:"live",organizationName:context.orgName,objective,agents,counts:{completed:tasks.filter(t=>t.status==="completed").length,running:tasks.filter(t=>t.status==="running").length,queued:tasks.filter(t=>t.status==="queued").length,approval:approvalResult.data?1:0,failed:tasks.filter(t=>t.status==="failed").length},approval:approvalResult.data?{id:approvalResult.data.id,title:approvalTask?.title??"Solicitud de aprobación",reason:approvalResult.data.reason,risk:approvalResult.data.risk_level,agentName:proposer?.name??"Agente",agentRole:proposer?.role??"Equipo"}:null,activity:(activityResult.data??[]).map(item=>({id:item.id,summary:item.summary,action:item.action,createdAt:item.created_at})),health:{healthy,lastDispatch}};
 }
 
 export function relativeTime(value: string|null) { if(!value)return "sin ejecuciones";const seconds=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/1000));if(seconds<60)return `hace ${seconds} s`;if(seconds<3600)return `hace ${Math.floor(seconds/60)} min`;if(seconds<86400)return `hace ${Math.floor(seconds/3600)} h`;return `hace ${Math.floor(seconds/86400)} d`; }
