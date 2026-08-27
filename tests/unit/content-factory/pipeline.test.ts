@@ -96,3 +96,15 @@ describe("agent pipeline snapshot", () => {
     expect(buildPipeline(rows, 2, NOW)).toEqual(buildPipeline(rows, 2, NOW));
   });
 });
+
+// A content approval carries campaign_id, so the campaign strategy panel must exclude them.
+// Without the filter it showed a content decision as the strategy decision, and its Approve
+// button would have decided the wrong artefact.
+describe("campaign approval scoping", () => {
+  it("filters content approvals out of the campaign strategy query", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("../../../src/features/campaigns/data.ts", import.meta.url), "utf8");
+    const line = source.split("\n").find((row) => row.includes('from("approvals")'))!;
+    expect(line).toContain('is("content_item_id",null)');
+  });
+});

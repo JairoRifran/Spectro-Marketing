@@ -28,7 +28,7 @@ export async function getCampaignDetail(id:string){
     ctx.db.from("campaign_channels").select("*").eq("campaign_id",id).eq("strategy_version",version).order("score",{ascending:false}).limit(7),ctx.db.from("campaign_content_pillars").select("*").eq("campaign_id",id).eq("strategy_version",version).order("weight",{ascending:false}).limit(20),
     ctx.db.from("campaign_angles").select("*").eq("campaign_id",id).eq("strategy_version",version).order("confidence",{ascending:false}).limit(30),ctx.db.from("campaign_messaging_frameworks").select("*").eq("campaign_id",id).eq("strategy_version",version).maybeSingle(),
     ctx.db.from("activity_log").select("id,action,summary,metadata,created_at,agents(display_name)").eq("campaign_id",id).order("created_at",{ascending:false}).limit(50),ctx.db.from("tasks").select("id,title,type,status,created_at,agents(display_name)").eq("campaign_id",id).order("created_at").limit(20),
-    ctx.db.from("approvals").select("id,status,decision_note,created_at").eq("campaign_id",id).order("created_at",{ascending:false}).limit(1).maybeSingle(),
+    ctx.db.from("approvals").select("id,status,decision_note,created_at").eq("campaign_id",id).is("content_item_id",null).order("created_at",{ascending:false}).limit(1).maybeSingle(),
   ]);
   return{mode:"live" as const,orgName:ctx.orgName,role:ctx.role,campaign,audience:audience.data,research:research.data,channels:channels.data??[],pillars:pillars.data??[],angles:angles.data??[],messaging:messaging.data,activity:activity.data??[],tasks:tasks.data??[],approval:approval.data,pillarReport:pillarWeightReport((pillars.data??[]) as Array<{weight:number}>)};
 }
