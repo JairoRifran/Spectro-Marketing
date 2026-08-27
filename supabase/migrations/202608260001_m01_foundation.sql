@@ -260,7 +260,7 @@ revoke all on function public.create_organization(text,text,text) from public; g
 
 create or replace function public.enforce_task_transition() returns trigger language plpgsql as $$ begin
   if old.status=new.status then return new; end if;
-  if not case old.status
+  if not (case old.status
     when 'draft' then new.status in ('pending','queued','cancelled')
     when 'pending' then new.status in ('queued','blocked','waiting_approval','cancelled')
     when 'queued' then new.status in ('running','blocked','waiting_approval','cancelled')
@@ -268,7 +268,7 @@ create or replace function public.enforce_task_transition() returns trigger lang
     when 'blocked' then new.status in ('pending','queued','cancelled')
     when 'waiting_approval' then new.status in ('queued','cancelled')
     when 'failed' then new.status in ('queued','cancelled')
-    else false end then raise exception 'invalid task transition: % -> %',old.status,new.status using errcode='check_violation'; end if;
+    else false end) then raise exception 'invalid task transition: % -> %',old.status,new.status using errcode='check_violation'; end if;
   if new.status='running' then new.started_at=coalesce(new.started_at,now()); end if;
   if new.status in ('completed','failed','cancelled') then new.completed_at=now(); new.locked_at=null; new.locked_by=null; new.lease_expires_at=null; end if;
   return new;
