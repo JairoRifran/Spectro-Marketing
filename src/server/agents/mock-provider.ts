@@ -1,5 +1,6 @@
 import type { AgentContext, AgentProvider, AgentResult } from "./contracts";
 import { CAMPAIGN_PROMPTS } from "@/server/campaigns/prompts";
+import { mockContentResult } from "@/server/content-factory/mock-content";
 
 type CampaignInput={campaignId?:string;strategyVersion?:number;campaignName?:string;objectiveTitle?:string;objectiveDescription?:string;metric?:string;target?:number;audienceHint?:string;brandName?:string;brandTone?:string;forbiddenClaims?:string[];forbiddenWords?:string[];productNames?:string[];personaNames?:string[];knowledgeTitles?:string[];constraints?:string[]};
 const shared=(context:AgentContext)=>context.task.input as CampaignInput;
@@ -66,6 +67,8 @@ export class MockProvider implements AgentProvider {
   async run(context: AgentContext): Promise<AgentResult> {
     if (context.task.type === "test.fail.retryable") {const failures=typeof context.task.input.failuresBeforeSuccess==="number"?context.task.input.failuresBeforeSuccess:Number.POSITIVE_INFINITY;if(context.task.attempt_count<=failures)throw Object.assign(new Error("Deterministic retry test"),{retryable:true});}
     const campaign=campaignResult(context);if(campaign)return campaign;
+    const contentResult = mockContentResult(context);
+    if (contentResult) return contentResult;
     if (context.task.type === "cmo.daily_review") return {summary:"Revisión diaria completada; se delegó el análisis de señales de mercado.",output:{provider:"mock",reviewed:["objectives","queue","approvals"],generatedAt:new Date().toISOString()},delegatedTasks:[{role:"market_intelligence",title:"Revisar señales de mercado",description:"Identificar cambios y oportunidades relevantes para los objetivos activos.",type:"market.review_signals",reason:"Seguimiento derivado de la revisión diaria del CMO",input:{sourceTaskId:context.task.id}}]};
     return {summary:`Tarea ${context.task.type} completada por MockProvider.`,output:{provider:"mock",deterministic:true,taskType:context.task.type}};
   }

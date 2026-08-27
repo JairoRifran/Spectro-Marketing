@@ -8,6 +8,7 @@ import type { RuntimeTask } from "@/server/tasks/types";
 import { retryDecision } from "@/server/tasks/retry";
 import { executionAllowed } from "@/server/policies/execution";
 import { persistCampaignOutcome } from "@/server/campaigns/outcomes";
+import { persistContentOutcome } from "@/server/content-factory/outcomes";
 
 type AgentRow = { id: string; organization_id: string; role: string; display_name: string; autonomy_level: 0|1|2|3; configuration: Record<string,unknown> };
 
@@ -82,6 +83,7 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
     const startedAt=Date.now();
     const result = await getAgentProvider().run({ organizationId: task.organization_id, agent: { id: agent.id, role: agent.role, displayName: agent.display_name, autonomyLevel: agent.autonomy_level, configuration: agent.configuration }, task, correlationId });
     await persistCampaignOutcome(db,task,result,agent);
+    await persistContentOutcome(db,task,result,agent);
     const completedAt = new Date().toISOString();
     const { data: completedTask, error: completionError } = await db.from("tasks").update({ status: "completed", output: result.output }).eq("id", task.id).eq("locked_by", workerId).eq("status", "running").select("id").maybeSingle();
     if (completionError || !completedTask) throw Object.assign(new Error("Task lease was lost before completion"), { retryable: true });
