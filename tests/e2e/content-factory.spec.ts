@@ -90,3 +90,34 @@ test("the version history is navigable and never overwritten", async ({ page }) 
   await expect(page.getByRole("navigation", { name: "Versiones" })).toBeVisible();
   await expect(page.getByRole("link", { name: "v1" })).toBeVisible();
 });
+
+test("the pipeline shows who is working and on what, without inventing activity", async ({ page }) => {
+  await page.goto("/campaigns/00000000-0000-0000-0000-000000000401");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  await expect(pipeline).toBeVisible();
+  await expect(pipeline.getByText("Los agentes están trabajando")).toBeVisible();
+
+  // Clara is mid-task, so her row names the real task rather than a generic label.
+  await expect(pipeline.getByText("Escribir tiktok: Proceso antes que herramienta")).toBeVisible();
+
+  // Emilia has nothing queued in the fixture and must read Idle, not a fabricated state.
+  const emilia = pipeline.locator("li", { hasText: "Emilia" });
+  await expect(emilia).toContainText("Idle");
+});
+
+test("the pipeline reports counts, never predicted performance", async ({ page }) => {
+  await page.goto("/campaigns/00000000-0000-0000-0000-000000000401");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  await expect(pipeline.getByText(/\d+ completadas · \d+ en curso/)).toBeVisible();
+  await expect(pipeline.getByText(/viral|probabilidad|alcance estimado|engagement/i)).toHaveCount(0);
+});
+
+test("the pipeline stays readable on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 780 });
+  await page.goto("/campaigns/00000000-0000-0000-0000-000000000401");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  await expect(pipeline).toBeVisible();
+  // The drawing is decorative and hidden on narrow screens; the list carries the information.
+  await expect(pipeline.locator(".pipeline-canvas")).toBeHidden();
+  await expect(pipeline.locator(".pipeline-list li").first()).toBeVisible();
+});
