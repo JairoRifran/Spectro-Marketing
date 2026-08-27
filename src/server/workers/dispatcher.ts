@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { log } from "@/lib/logging/logger";
 import { publicError } from "@/server/errors";
 import { eventToTask, type PersistentEvent } from "@/server/events/handler";
-import { getAgentProvider } from "@/server/agents/provider";
+import { configuredAgentProviderName, getAgentProvider } from "@/server/agents/provider";
 import type { RuntimeTask } from "@/server/tasks/types";
 import { retryDecision } from "@/server/tasks/retry";
 import { executionAllowed } from "@/server/policies/execution";
@@ -60,6 +60,7 @@ async function failEvent(db: SupabaseClient, event: PersistentEvent, code: strin
 
 async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: string): Promise<"completed"|"retried"|"failed"> {
   const correlationId = crypto.randomUUID();
+  const providerName = configuredAgentProviderName();
   const { data: agentData, error: agentError } = task.assigned_agent_id
     ? await db.from("agents").select("id,organization_id,role,display_name,autonomy_level,configuration").eq("id", task.assigned_agent_id).single()
     : { data: null, error: null };
@@ -73,7 +74,7 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
   const runKey = `task:${task.id}:attempt:${task.attempt_count}`;
   const { data: taskRun, error: taskRunError } = await db.from("task_runs").insert({ organization_id: task.organization_id, task_id: task.id, agent_id: agent.id, attempt_number: task.attempt_count, worker_id: workerId, status: "running", input: task.input, correlation_id: correlationId }).select("id").single();
   if (taskRunError) return finishFailure(db, task, workerId, new Error(taskRunError.code));
-  const { data: agentRun, error: agentRunError } = await db.from("agent_runs").insert({ organization_id: task.organization_id, agent_id: agent.id, task_id: task.id, event_id: task.source_event_id, provider: process.env.AI_PROVIDER ?? "mock", status: "running", input: task.input, idempotency_key: runKey }).select("id").single();
+  const { data: agentRun, error: agentRunError } = await db.from("agent_runs").insert({ organization_id: task.organization_id, agent_id: agent.id, task_id: task.id, event_id: task.source_event_id, provider: providerName, status: "running", input: task.input, idempotency_key: runKey }).select("id").single();
   if (agentRunError) return finishFailure(db, task, workerId, new Error(agentRunError.code), taskRun.id);
 
   log("info", "task.started", { organizationId: task.organization_id, taskId: task.id, agentId: agent.id, runId: agentRun.id, eventId: task.source_event_id ?? undefined, correlationId });
@@ -89,7 +90,7 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
       db.from("task_runs").update({ status: "completed", output: result.output, completed_at: completedAt }).eq("id", taskRun.id),
       db.from("agent_runs").update({ status: "completed", output: result.output, completed_at: completedAt, model: typeof result.output.model==="string"?result.output.model:null, prompt_version:typeof result.output.promptVersion==="string"?result.output.promptVersion:null, latency_ms:Date.now()-startedAt }).eq("id", agentRun.id),
       db.from("agents").update({ last_run_at: completedAt }).eq("id", agent.id),
-      db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: "task.completed", actor_type: "agent", actor_id: agent.id, entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: agent.id, event_id: task.source_event_id, run_id: agentRun.id, summary: result.summary, metadata: { provider: process.env.AI_PROVIDER ?? "mock", correlation_id: correlationId } }),
+      db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: "task.completed", actor_type: "agent", actor_id: agent.id, entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: agent.id, event_id: task.source_event_id, run_id: agentRun.id, summary: result.summary, metadata: { provider: providerName, correlation_id: correlationId } }),
     ]);
     return "completed";
   } catch (error) {
