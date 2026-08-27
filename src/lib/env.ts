@@ -13,10 +13,12 @@ const serverSchema = publicSchema.extend({
   TASK_LEASE_SECONDS: z.coerce.number().int().min(15).max(900).default(120),
 });
 
+const emptyAsUndefined = (value: unknown) => value === "" ? undefined : value;
+
 const runtimeSchema = z.object({
-  AUTOMATION_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
-  DEPLOYMENT_ENVIRONMENT: z.enum(["development", "preview", "production", "test"]).default("development"),
-  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+  AUTOMATION_ENABLED: z.preprocess(emptyAsUndefined,z.enum(["true", "false"]).default("false")).transform((value) => value === "true"),
+  DEPLOYMENT_ENVIRONMENT: z.preprocess(emptyAsUndefined,z.enum(["development", "preview", "production", "test"]).default("development")),
+  VERCEL_ENV: z.preprocess(emptyAsUndefined,z.enum(["development", "preview", "production"]).optional()),
 });
 
 export function getPublicEnv() {
