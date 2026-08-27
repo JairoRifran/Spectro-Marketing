@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { getPendingApprovalCount } from "@/features/approvals/count";
 import { getOrganizationContext } from "@/features/organizations/context";
 import { automationIsEnabled } from "@/lib/env";
 
@@ -8,7 +9,7 @@ const primaryNav = [
   { href: "/", label: "Marketing HQ", icon: Gauge },
   { href: "/agents", label: "Agentes", icon: Bot },
   { href: "/tasks", label: "Trabajo", icon: CheckSquare2 },
-  { href: "/approvals", label: "Aprobaciones", icon: Command, badge: "1" },
+  { href: "/approvals", label: "Aprobaciones", icon: Command },
   { href: "/knowledge", label: "Conocimiento", icon: BrainCircuit },
 ];
 
@@ -17,8 +18,9 @@ const settingsNav = [
   { href: "/settings/automation", label: "Automatización", icon: Settings2 },
 ];
 
-export async function DashboardShell({ children, activePath, organizationName="Northstar Urban", demo=true }: { children: ReactNode; activePath: string; organizationName?: string; demo?: boolean }) {
+export async function DashboardShell({ children, activePath, organizationName="Sin organización", demo=false }: { children: ReactNode; activePath: string; organizationName?: string; demo?: boolean }) {
   const context = demo ? null : await getOrganizationContext();
+  const pendingApprovals = await getPendingApprovalCount();
   const automationEnabled = automationIsEnabled();
   return (
     <div className="app-shell">
@@ -42,7 +44,7 @@ export async function DashboardShell({ children, activePath, organizationName="N
           <p className="nav-label">OPERACIONES</p>
           {primaryNav.map((item) => (
             <Link key={item.href} href={item.href} className={activePath === item.href ? "nav-item active" : "nav-item"}>
-              <item.icon size={18} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}
+              <item.icon size={18} /><span>{item.label}</span>{item.href === "/approvals" && pendingApprovals > 0 && <em>{pendingApprovals}</em>}
             </Link>
           ))}
           <p className="nav-label nav-label-spaced">CONFIGURACIÓN</p>

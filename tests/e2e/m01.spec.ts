@@ -27,3 +27,12 @@ test("health and automation endpoints expose no internals in demo",async({reques
   expect(dispatch.status()).toBe(503);
   expect(await dispatch.json()).toEqual({error:"automation_disabled"});
 });
+
+test("approval badge matches the pending decisions count",async({page})=>{
+  await page.goto("/");
+  const badge=page.locator("a.nav-item",{hasText:"Aprobaciones"}).locator("em");
+  const pending=page.locator(".count-badge").first();
+  await expect(pending).toBeVisible();
+  await expect(badge).toBeVisible();
+  expect((await badge.textContent())?.trim()).toBe((await pending.textContent())?.trim());
+});
