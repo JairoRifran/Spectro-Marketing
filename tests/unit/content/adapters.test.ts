@@ -4,7 +4,7 @@ import { generateMockVariants, isMockContent, MOCK_NOTICE } from "@/server/conte
 import { comparableText, DUPLICATE_THRESHOLD } from "@/server/content/quality/duplication";
 import { textSimilarity } from "@/server/content/quality/text";
 import { getPlaybook } from "@/server/content/playbooks";
-import { shapeOf, supportsFormat } from "@/server/content/platforms";
+import { CONTENT_FORMATS, shapeOf, SUPPORTED_PLATFORMS, supportsFormat } from "@/server/content/platforms";
 import { contentBriefSchema } from "@/server/content/schemas/brief";
 import { platformContentVariantSchema } from "@/server/content/schemas/variant";
 import { context } from "../../fixtures/content/base";
@@ -71,6 +71,24 @@ describe("platform adapters", () => {
     const shorts = draftsFor(context).find((variant) => variant.platform === "youtube_shorts")!;
     expect(shorts.metadata.title).toBeTruthy();
     expect(shorts.metadata.description).toBeTruthy();
+  });
+
+  // A LinkedIn concept asking for a document_post reached production and failed with
+  // shape_mismatch: the adapter advertised a format its draft could not build. An adapter must
+  // never choose a format it cannot produce, whatever the concept or channel config asks for.
+  it("only ever chooses a format it can actually produce", () => {
+    for (const platform of SUPPORTED_PLATFORMS) {
+      const adapter = getAdapter(platform);
+      for (const format of CONTENT_FORMATS) {
+        if (!supportsFormat(platform, format)) continue;
+        const concept = { ...context.concept, format, platforms: [platform] as typeof context.concept.platforms };
+        const chosen = adapter.chooseFormat(concept);
+        expect(supportsFormat(platform, chosen), `${platform} chose unsupported ${chosen}`).toBe(true);
+        const variant = adapter.draft({ ...context, concept });
+        expect(variant.detail.shape, `${platform}/${format} -> ${chosen}`).toBe(shapeOf(chosen));
+        expect(variant.format).toBe(chosen);
+      }
+    }
   });
 });
 

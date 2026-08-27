@@ -116,7 +116,7 @@ export const youtubeShortsAdapter: PlatformAdapter = {
 
 export const linkedinAdapter: PlatformAdapter = {
   platform: "linkedin",
-  chooseFormat: (concept: ContentConcept) => resolveFormat("linkedin", ["text_post", "document_post"], concept.format),
+  chooseFormat: (concept: ContentConcept) => resolveFormat("linkedin", ["text_post"], concept.format),
   brief: (context) => buildBrief("linkedin", linkedinAdapter.chooseFormat(context.concept), context),
   draft(context) {
     const hook = clampWords(`La mayoría de los equipos trata ${context.concept.pillar.toLowerCase()} como un problema de esfuerzo. Casi nunca lo es.`, hookBudget("linkedin"));
