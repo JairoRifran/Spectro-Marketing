@@ -97,8 +97,8 @@ test("the pipeline shows who is working and on what, without inventing activity"
   await expect(pipeline).toBeVisible();
   await expect(pipeline.getByText("Los agentes están trabajando")).toBeVisible();
 
-  // Clara is mid-task, so her row names the real task rather than a generic label.
-  await expect(pipeline.getByText("Escribir tiktok: Proceso antes que herramienta")).toBeVisible();
+  // Clara is mid-task, so the "right now" band names the real task rather than a generic label.
+  await expect(pipeline.locator(".pipeline-now").getByText("Escribir tiktok: Proceso antes que herramienta")).toBeVisible();
 
   // Emilia has nothing queued in the fixture and must read Idle, not a fabricated state.
   const emilia = pipeline.locator("li", { hasText: "Emilia" });
@@ -120,4 +120,34 @@ test("the pipeline stays readable on a phone", async ({ page }) => {
   // The drawing is decorative and hidden on narrow screens; the list carries the information.
   await expect(pipeline.locator(".pipeline-canvas")).toBeHidden();
   await expect(pipeline.locator(".pipeline-list li").first()).toBeVisible();
+});
+
+// The pipeline view was built but only mounted inside a campaign tab, so the person who lands on
+// Marketing HQ never saw it. Its whole value is answering "where is my work?" on arrival, so its
+// presence there — and the fact that it names who has the work — is worth asserting.
+test("Marketing HQ opens on where the work actually is", async ({ page }) => {
+  await page.goto("/");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  await expect(pipeline).toBeVisible();
+  await expect(pipeline.getByText("PIPELINE DEL EQUIPO")).toBeVisible();
+  // Not a generic label: the real task title of the agent that currently holds the work.
+  const now = pipeline.locator(".pipeline-now");
+  await expect(now.getByText(/Escribir tiktok: Proceso antes que herramienta/)).toBeVisible();
+  await expect(now.getByText(/1 pieza espera tu decisión/)).toBeVisible();
+});
+
+// Motion has to mean one specific thing. A pulsing green node and a flowing link mean an agent
+// genuinely holds the work; waiting on a person is drawn differently, because the system is not
+// doing anything at that point and must not look like it is.
+test("only a stage an agent is genuinely working is animated", async ({ page }) => {
+  await page.goto("/");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+
+  // Clara is the only agent mid-task in the demo snapshot.
+  await expect(pipeline.locator(".pipeline-node.is-working")).toHaveCount(1);
+  await expect(pipeline.locator(".pipeline-flow.is-flowing")).toHaveCount(1);
+
+  // The pending human decision is present, but as waiting rather than as work in flight.
+  await expect(pipeline.locator(".pipeline-node.is-waiting")).toHaveCount(1);
+  await expect(pipeline.locator(".pipeline-now li.is-human")).toHaveCount(1);
 });

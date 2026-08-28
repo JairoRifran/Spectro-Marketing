@@ -98,7 +98,10 @@
 .pipeline-canvas{width:100%;height:auto;margin-top:6px;overflow:visible}
 .pipeline-phase{fill:#a3adaa;font-size:9px;letter-spacing:.14em}
 .pipeline-link{stroke:#dfe6e4;stroke-width:2}
-.pipeline-link.is-active{stroke:#9dc4b4}
+.pipeline-flow.is-done .pipeline-link{stroke:#bcd9c9}
+.pipeline-flow.is-flowing .pipeline-link{stroke:#16a47a;stroke-dasharray:5 7;animation:pipeline-dash .9s linear infinite}
+@keyframes pipeline-dash{to{stroke-dashoffset:-12}}
+.pipeline-parcel{fill:#16a47a}
 .pipeline-disc{fill:#f2f5f4;stroke:#dfe6e4;stroke-width:1.5}
 .pipeline-initials{fill:#8b9592;font-size:11px;font-weight:750}
 .pipeline-agent{fill:#3d4b48;font-size:10px;font-weight:650}
@@ -110,14 +113,33 @@
 .pipeline-node.is-working .pipeline-disc{fill:#16a47a;stroke:#128a66}
 .pipeline-node.is-working .pipeline-initials{fill:#fff}
 .pipeline-node.is-working .pipeline-agent{fill:#146b52;font-weight:750}
+.pipeline-node.is-waiting .pipeline-disc{fill:#fdf6e8;stroke:#e2c98d;stroke-width:2}
+.pipeline-node.is-waiting .pipeline-initials{fill:#96701a}
+.pipeline-node.is-waiting .pipeline-agent{fill:#8a6413;font-weight:750}
 .pipeline-node.has-failed .pipeline-disc{stroke:#c98c7f;stroke-width:2}
 
 .pipeline-pulse{fill:none;stroke:#16a47a;stroke-width:2;opacity:.55;transform-origin:center;transform-box:fill-box;animation:pipeline-pulse 1.8s ease-out infinite}
 @keyframes pipeline-pulse{0%{transform:scale(.78);opacity:.55}70%{transform:scale(1.18);opacity:0}100%{transform:scale(1.18);opacity:0}}
+/* Motion is the point of this view, but it is never the only carrier of the state. */
+@media (prefers-reduced-motion:reduce){.pipeline-pulse,.pipeline-flow.is-flowing .pipeline-link{animation:none}.pipeline-parcel{display:none}}
 
-.pipeline-list{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:5px}
+.pipeline-tick{fill:none;stroke:#1f6a45;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* What is happening right now, in words, for the people who will not read a diagram. */
+.pipeline-now{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.pipeline-now li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:#eefaf4;border:1px solid #d3ebe0}
+.pipeline-now li.is-human{background:#fdf6e8;border-color:#efe0bf}
+.pipeline-now-avatar{flex:none;width:26px;height:26px;border-radius:50%;background:#16a47a;color:#fff;font-size:9px;font-weight:750;display:grid;place-items:center}
+.pipeline-now li.is-human .pipeline-now-avatar{background:#b8871f}
+.pipeline-now strong{display:block;font-size:10px;color:#25403a}
+.pipeline-now p{margin:1px 0 0;font-size:10px;color:#4c5b58}
+.pipeline-now-count{margin-left:auto;font-size:9px;font-weight:700;color:#146b52;background:#fff;border-radius:99px;padding:2px 7px}
+.pipeline-idle{margin:12px 0 0;font-size:10px;color:#8b9592}
+
+.pipeline-list{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:5px}
 .pipeline-list li{display:grid;grid-template-columns:78px 118px 1fr auto;gap:10px;align-items:baseline;padding:6px 8px;border-radius:7px;font-size:9px}
 .pipeline-list li.is-working{background:#eefaf4}
+.pipeline-list li.is-waiting{background:#fdf6e8}
 .pipeline-list-agent{color:#25403a;font-weight:650}
 .pipeline-list-stage{color:#8b9592}
 .pipeline-list-state{color:#4c5b58}

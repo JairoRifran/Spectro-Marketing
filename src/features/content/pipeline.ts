@@ -36,3 +36,21 @@ function demoPipeline(): PipelineSnapshot {
   ];
   return buildPipeline(tasks, 1, new Date().toISOString());
 }
+
+/**
+ * The same read model across every campaign in the organization. Marketing HQ is where a person
+ * lands, so the question "where is my work right now?" has to be answerable there, not only
+ * after drilling into one campaign.
+ */
+export async function getOrganizationPipeline(): Promise<PipelineSnapshot | null> {
+  if (isDemoMode) return demoPipeline();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
+
+  const [tasks, approvals] = await Promise.all([
+    ctx.db.from("tasks").select("type,status,title").eq("organization_id", ctx.orgId).limit(500),
+    ctx.db.from("approvals").select("id", { count: "exact", head: true }).eq("organization_id", ctx.orgId).eq("status", "requested").not("content_item_id", "is", null),
+  ]);
+
+  return buildPipeline((tasks.data ?? []) as TaskRow[], approvals.count ?? 0, new Date().toISOString());
+}
