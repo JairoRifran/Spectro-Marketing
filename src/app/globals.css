@@ -87,70 +87,71 @@
 @media(max-width:1100px){.content-detail{grid-template-columns:1fr}}
 @media(max-width:760px){.content-detail{gap:10px}.content-detail .detail-panel{padding:14px}.preview-slide{flex-basis:150px}.preview-story-sequence li{flex-basis:140px}.progress-counts,.strip-counts{gap:16px}.preview-scenes dl div{grid-template-columns:1fr;gap:2px}}
 
-/* --- Agent pipeline visualisation ------------------------------------------------------- */
-.agent-pipeline{margin-bottom:18px;padding:18px 20px;border:1px solid var(--line);border-radius:12px;background:#fff}
-.agent-pipeline>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px;flex-wrap:wrap}
-.agent-pipeline>header span{color:#8b9592;font-size:8px;letter-spacing:.1em}
-.agent-pipeline>header h3{margin:3px 0 0;font-size:15px;letter-spacing:-.02em}
-.pipeline-summary{margin:0;color:#75817e;font-size:9px}
+/* --- Agent pipeline: the team, not a diagram of boxes ------------------------------------ */
+.agent-pipeline{margin-bottom:18px;padding:18px 20px 16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.agent-pipeline>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.agent-pipeline>header span{color:#8b9592;font-size:8px;font-weight:750;letter-spacing:.15em}
+.agent-pipeline>header h3{margin:4px 0 0;font-size:16px;letter-spacing:-.02em}
+.pipeline-summary{margin:0;color:#75817e;font-size:10px}
 .pipeline-failed{color:#a4483a}.pipeline-stale{color:#8a5a17}
 
-.pipeline-canvas{width:100%;height:auto;margin-top:6px;overflow:visible}
-.pipeline-phase{fill:#a3adaa;font-size:9px;letter-spacing:.14em}
-.pipeline-link{stroke:#dfe6e4;stroke-width:2}
-.pipeline-flow.is-done .pipeline-link{stroke:#bcd9c9}
-.pipeline-flow.is-flowing .pipeline-link{stroke:#16a47a;stroke-dasharray:5 7;animation:pipeline-dash .9s linear infinite}
-@keyframes pipeline-dash{to{stroke-dashoffset:-12}}
-.pipeline-parcel{fill:#16a47a}
-.pipeline-disc{fill:#f2f5f4;stroke:#dfe6e4;stroke-width:1.5}
-.pipeline-initials{fill:#8b9592;font-size:11px;font-weight:750}
-.pipeline-agent{fill:#3d4b48;font-size:10px;font-weight:650}
-.pipeline-label{fill:#96a09d;font-size:8px}
-.pipeline-badge circle{fill:#25403a}.pipeline-badge text{fill:#fff;font-size:9px;font-weight:700}
-
-.pipeline-node.is-done .pipeline-disc{fill:#e6f4ec;stroke:#bcd9c9}
-.pipeline-node.is-done .pipeline-initials{fill:#1f6a45}
-.pipeline-node.is-working .pipeline-disc{fill:#16a47a;stroke:#128a66}
-.pipeline-node.is-working .pipeline-initials{fill:#fff}
-.pipeline-node.is-working .pipeline-agent{fill:#146b52;font-weight:750}
-.pipeline-node.is-waiting .pipeline-disc{fill:#fdf6e8;stroke:#e2c98d;stroke-width:2}
-.pipeline-node.is-waiting .pipeline-initials{fill:#96701a}
-.pipeline-node.is-waiting .pipeline-agent{fill:#8a6413;font-weight:750}
-.pipeline-node.has-failed .pipeline-disc{stroke:#c98c7f;stroke-width:2}
-
-.pipeline-pulse{fill:none;stroke:#16a47a;stroke-width:2;opacity:.55;transform-origin:center;transform-box:fill-box;animation:pipeline-pulse 1.8s ease-out infinite}
-@keyframes pipeline-pulse{0%{transform:scale(.78);opacity:.55}70%{transform:scale(1.18);opacity:0}100%{transform:scale(1.18);opacity:0}}
-/* Motion is the point of this view, but it is never the only carrier of the state. */
-@media (prefers-reduced-motion:reduce){.pipeline-pulse,.pipeline-flow.is-flowing .pipeline-link{animation:none}.pipeline-parcel{display:none}}
-
-.pipeline-tick{fill:none;stroke:#1f6a45;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
-
-/* What is happening right now, in words, for the people who will not read a diagram. */
-.pipeline-now{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px}
-.pipeline-now li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:#eefaf4;border:1px solid #d3ebe0}
+/* The live line: who has the work and the real task title, in full. */
+.pipeline-now{margin:0 0 14px;padding:0;list-style:none;display:grid;gap:6px}
+.pipeline-now li{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;background:#eefaf4;border:1px solid #d3ebe0}
 .pipeline-now li.is-human{background:#fdf6e8;border-color:#efe0bf}
 .pipeline-now-avatar{flex:none;width:26px;height:26px;border-radius:50%;background:#16a47a;color:#fff;font-size:9px;font-weight:750;display:grid;place-items:center}
 .pipeline-now li.is-human .pipeline-now-avatar{background:#b8871f}
 .pipeline-now strong{display:block;font-size:10px;color:#25403a}
-.pipeline-now p{margin:1px 0 0;font-size:10px;color:#4c5b58}
-.pipeline-now-count{margin-left:auto;font-size:9px;font-weight:700;color:#146b52;background:#fff;border-radius:99px;padding:2px 7px}
-.pipeline-idle{margin:12px 0 0;font-size:10px;color:#8b9592}
+.pipeline-now p{margin:1px 0 0;font-size:11px;color:#3f4f4c}
 
-.pipeline-list{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:5px}
-.pipeline-list li{display:grid;grid-template-columns:78px 118px 1fr auto;gap:10px;align-items:baseline;padding:6px 8px;border-radius:7px;font-size:9px}
-.pipeline-list li.is-working{background:#eefaf4}
-.pipeline-list li.is-waiting{background:#fdf6e8}
-.pipeline-list-agent{color:#25403a;font-weight:650}
-.pipeline-list-stage{color:#8b9592}
-.pipeline-list-state{color:#4c5b58}
-.pipeline-list li.is-idle .pipeline-list-state{color:#a3adaa}
-.pipeline-list-failed{color:#a4483a}
+.pipeline-phase-block+.pipeline-phase-block{margin-top:14px}
+.pipeline-phase-title{margin:0 0 8px;color:#8b9592;font-size:10px}
+.pipeline-phase-title b{color:#3d4b48;font-size:9px;font-weight:750;letter-spacing:.13em;text-transform:uppercase;margin-right:7px}
 
-@media(prefers-reduced-motion:reduce){.pipeline-pulse{animation:none;opacity:.35}}
+.pipeline-rail{margin:0;padding:0;list-style:none;display:flex;align-items:stretch;gap:0}
+.pipeline-stage{position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 6px}
+/* The rail between people. It is a connector, not decoration, so it lines up with the faces. */
+.pipeline-stage::before{content:"";position:absolute;top:21px;right:50%;left:-50%;height:2px;background:#e4eae8}
+.pipeline-stage:first-child::before{display:none}
+.pipeline-stage.is-done::before,.pipeline-stage.is-waiting::before{background:#bcd9c9}
+.pipeline-stage.is-working::before{background:linear-gradient(90deg,#bcd9c9 0 40%,#16a47a 40% 60%,#bcd9c9 60%);background-size:220% 100%;animation:pipeline-travel 1.5s linear infinite}
+@keyframes pipeline-travel{from{background-position:120% 0}to{background-position:-20% 0}}
+
+.pipeline-face{position:relative;z-index:1;width:42px;height:42px;display:grid;place-items:center;border-radius:12px;font-size:12px;font-weight:750;background:#eef1f0;color:#7d8a87;box-shadow:0 0 0 4px #fff}
+.pipeline-stage.tone-coral .pipeline-face{background:#f8ded7;color:#914c3b}
+.pipeline-stage.tone-blue .pipeline-face{background:#dce8f6;color:#476988}
+.pipeline-stage.tone-violet .pipeline-face{background:#ece2f4;color:#74578a}
+.pipeline-stage.tone-green .pipeline-face{background:#ddefe7;color:#3f6f5c}
+.pipeline-stage.tone-amber .pipeline-face{background:#fbeed3;color:#8a6413}
+.pipeline-stage.tone-rose .pipeline-face{background:#f9dde6;color:#8e4560}
+.pipeline-stage.tone-slate .pipeline-face{background:#e2e8e6;color:#4a5754}
+.pipeline-stage.is-idle .pipeline-face{background:#f2f4f3;color:#aab3b1}
+/* A tick is a small mark on the person, never a replacement for their face. */
+.pipeline-face-tick{position:absolute;right:-4px;bottom:-4px;width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:#16a47a;color:#fff;font-size:9px;font-weight:800;border:2px solid #fff}
+.pipeline-stage.is-working .pipeline-face{box-shadow:0 0 0 4px #fff,0 0 0 7px #b6e6d3;animation:pipeline-breathe 1.9s ease-in-out infinite}
+.pipeline-stage.is-waiting .pipeline-face{box-shadow:0 0 0 4px #fff,0 0 0 7px #f0dcb0}
+@keyframes pipeline-breathe{0%,100%{box-shadow:0 0 0 4px #fff,0 0 0 6px #cdeee0}50%{box-shadow:0 0 0 4px #fff,0 0 0 10px #a5e0c8}}
+
+.pipeline-who{margin-top:9px;font-size:12px;color:#233c37;letter-spacing:-.01em}
+.pipeline-does{margin-top:1px;color:#8b9592;font-size:9px}
+.pipeline-state{margin-top:5px;color:#66736f;font-size:9px}
+.pipeline-stage.is-idle .pipeline-state{color:#a9b2b0}
+.pipeline-stage.is-working .pipeline-state{color:#12805f;font-weight:650}
+.pipeline-stage.is-waiting .pipeline-state{color:#8a6413;font-weight:650}
+.pipeline-broke{margin-top:2px;color:#a4483a;font-size:9px}
+
+@media(prefers-reduced-motion:reduce){
+  .pipeline-stage.is-working .pipeline-face{animation:none}
+  .pipeline-stage.is-working::before{animation:none;background:#16a47a}
+}
 @media(max-width:820px){
-  .pipeline-canvas{display:none}
-  .pipeline-list{margin-top:8px}
-  .pipeline-list li{grid-template-columns:70px 1fr;grid-template-areas:"agent stage" "state state";row-gap:2px}
-  .pipeline-list-agent{grid-area:agent}.pipeline-list-stage{grid-area:stage}.pipeline-list-state{grid-area:state}
-  .pipeline-list-failed{grid-column:1/-1}
+  /* A horizontal rail cannot survive a phone, so the team becomes a vertical list of rows. */
+  .pipeline-rail{flex-direction:column;gap:4px}
+  .pipeline-stage{flex-direction:row;align-items:center;text-align:left;gap:11px;padding:5px 0;display:grid;grid-template-columns:42px 1fr auto}
+  .pipeline-stage::before{display:none}
+  .pipeline-face{grid-row:1/3}
+  .pipeline-who{margin-top:0;grid-column:2}
+  .pipeline-does{grid-column:2;grid-row:2}
+  .pipeline-state{margin-top:0;grid-column:3;grid-row:1/3;align-self:center}
+  .pipeline-broke{grid-column:3}
 }

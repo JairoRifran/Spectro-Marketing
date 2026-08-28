@@ -4,98 +4,93 @@ import type { PipelineSnapshot, PipelineStage, StageStatus } from "@/server/cont
 
 // Live view of where the work is and who has it.
 //
-// Deliberately SVG rather than a 3D scene: this is a nine-node state diagram, so depth and a
-// camera would buy nothing and cost a WebGL dependency. The drawing is aria-hidden and purely
-// decorative; the band and list underneath carry the same information as text, which is what a
-// screen reader and a narrow phone actually get.
+// Built as a rail of people rather than a diagram of boxes. The first version drew nine
+// identical discs, so a finished pipeline read as nine anonymous ticks and the counts floated
+// with no unit — "16" of what? Here every stage is the agent who does it, with their own colour
+// and their state written out, because "Clara · 16 piezas escritas" is understood at a glance
+// and a green circle is not.
 //
-// Every moving thing on screen is driven by a real task row. A link only flows when the stage it
-// feeds is genuinely working, so the animation cannot suggest progress the database never made.
-
-const STRATEGY_X = [90, 270, 450, 630, 810];
-const CONTENT_X = [90, 330, 570, 810];
-const STRATEGY_Y = 74;
-const CONTENT_Y = 196;
+// Every state comes from a real task row. A stage pulses only while an agent genuinely holds
+// work; waiting on a person is drawn differently, because at that point the system is doing
+// nothing and must not look busy.
 
 /** Poll fast while agents are working, slowly when idle, and never in a tight loop. */
 const BUSY_INTERVAL_MS = 3000;
 const IDLE_INTERVAL_MS = 15000;
 
-function initials(name: string) {
-  return name.slice(0, 2).toUpperCase();
-}
+/** Keyed on the stable M01 agent role, never on the display name. */
+const TONE: Record<string, string> = {
+  cmo: "coral",
+  market_intelligence: "blue",
+  social_media_director: "violet",
+  content_strategist: "green",
+  copywriter: "amber",
+  creative_director: "rose",
+  human: "slate",
+};
 
-/**
- * Waiting on a person is not an agent working, and drawing it the same way overstates what the
- * system is doing. The human stage gets its own state so a pulsing green node always means an
- * agent genuinely holds the work.
- */
 type VisualState = StageStatus | "waiting";
 
+/**
+ * Waiting on a person is not an agent working. Separating it keeps a pulsing stage meaning one
+ * single thing: an agent has the work right now.
+ */
 function visualStateOf(stage: PipelineStage): VisualState {
   if (stage.status === "working" && !stage.taskType) return "waiting";
   return stage.status;
 }
 
-function Node({ stage, x, y }: { stage: PipelineStage; x: number; y: number }) {
-  const total = stage.active + stage.completed;
+function initials(name: string) {
+  return name.slice(0, 2).toUpperCase();
+}
+
+function plural(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** The state in the words a person would use, never a bare number with no unit. */
+function stateLine(stage: PipelineStage, visual: VisualState) {
+  if (visual === "working") return stage.active > 1 ? plural(stage.active, "tarea en curso", "tareas en curso") : "Trabajando ahora";
+  if (visual === "waiting") return plural(stage.active, "pieza te espera", "piezas te esperan");
+  if (visual === "done") return plural(stage.completed, "tarea lista", "tareas listas");
+  return "Sin trabajo";
+}
+
+function Stage({ stage }: { stage: PipelineStage }) {
   const visual = visualStateOf(stage);
   return (
-    <g className={`pipeline-node is-${visual}${stage.failed ? " has-failed" : ""}`}>
-      {visual === "working" && <circle cx={x} cy={y} r={34} className="pipeline-pulse" />}
-      <circle cx={x} cy={y} r={26} className="pipeline-disc" />
-      {visual === "done" ? (
-        <path d={`M ${x - 8} ${y} l 5.5 6 l 10.5 -12`} className="pipeline-tick" />
-      ) : (
-        <text x={x} y={y + 4} textAnchor="middle" className="pipeline-initials">{initials(stage.agentName)}</text>
+    <li className={`pipeline-stage is-${visual} tone-${TONE[stage.agentRole] ?? "slate"}`}>
+      <span className="pipeline-face" aria-hidden="true">
+        {initials(stage.agentName)}
+        {visual === "done" && <b className="pipeline-face-tick">✓</b>}
+      </span>
+      <strong className="pipeline-who">{stage.agentName}</strong>
+      <span className="pipeline-does">{stage.label}</span>
+      <span className="pipeline-state">{stateLine(stage, visual)}</span>
+      {stage.failed > 0 && (
+        <span className="pipeline-broke">{plural(stage.failed, "falló", "fallaron")}</span>
       )}
-      <text x={x} y={y + 46} textAnchor="middle" className="pipeline-agent">{stage.agentName}</text>
-      <text x={x} y={y + 60} textAnchor="middle" className="pipeline-label">{stage.label}</text>
-      {total > 0 && (
-        <g className="pipeline-badge">
-          <circle cx={x + 22} cy={y - 22} r={11} />
-          <text x={x + 22} y={y - 18} textAnchor="middle">{total}</text>
-        </g>
-      )}
-    </g>
+    </li>
   );
 }
 
-/**
- * A link carries work from one stage to the next. It flows only while the stage it feeds is
- * working; once that stage is done the link is drawn as travelled, not as moving.
- */
-function Connector({ from, to, y, state }: { from: number; to: number; y: number; state: "idle" | "done" | "flowing" }) {
-  const x1 = from + 30;
-  const x2 = to - 30;
+function Phase({ title, caption, stages }: { title: string; caption: string; stages: PipelineStage[] }) {
   return (
-    <g className={`pipeline-flow is-${state}`}>
-      <line x1={x1} y1={y} x2={x2} y2={y} className="pipeline-link" />
-      {state === "flowing" && (
-        <circle r={4} cy={y} className="pipeline-parcel">
-          <animate attributeName="cx" from={x1} to={x2} dur="1.6s" repeatCount="indefinite" />
-        </circle>
-      )}
-    </g>
+    <div className="pipeline-phase-block">
+      <p className="pipeline-phase-title"><b>{title}</b> {caption}</p>
+      <ol className="pipeline-rail">
+        {stages.map((stage) => <Stage key={stage.key} stage={stage} />)}
+      </ol>
+    </div>
   );
 }
 
-function Row({ stages, xs, y, phase }: { stages: PipelineStage[]; xs: number[]; y: number; phase: string }) {
-  return (
-    <>
-      <text x={0} y={y - 52} className="pipeline-phase">{phase}</text>
-      {stages.map((stage, index) => index > 0 && (
-        <Connector
-          key={`link-${stage.key}`}
-          from={xs[index - 1]}
-          to={xs[index]}
-          y={y}
-          state={visualStateOf(stage) === "working" ? "flowing" : stage.status === "idle" ? "idle" : "done"}
-        />
-      ))}
-      {stages.map((stage, index) => <Node key={stage.key} stage={stage} x={xs[index]} y={y} />)}
-    </>
-  );
+/** One sentence that says what is going on, so nobody has to decode the rail to find out. */
+function headline(snapshot: PipelineSnapshot, waiting: boolean) {
+  if (snapshot.busy) return "Tu equipo está trabajando ahora";
+  if (waiting) return "El trabajo está hecho y espera tu decisión";
+  if (snapshot.totals.completed > 0) return "Todo el trabajo pedido está terminado";
+  return "Todavía no le pediste trabajo al equipo";
 }
 
 export function AgentPipeline({ campaignId, initial }: { campaignId?: string | null; initial: PipelineSnapshot }) {
@@ -140,63 +135,41 @@ export function AgentPipeline({ campaignId, initial }: { campaignId?: string | n
 
   const strategy = snapshot.stages.filter((stage) => stage.phase === "strategy");
   const content = snapshot.stages.filter((stage) => stage.phase === "content");
-  const working = snapshot.stages.filter((stage) => stage.status === "working");
+  const busyStages = snapshot.stages.filter((stage) => visualStateOf(stage) === "working");
+  const waitingStages = snapshot.stages.filter((stage) => visualStateOf(stage) === "waiting");
 
   return (
     <section className={`agent-pipeline${snapshot.busy ? " is-busy" : ""}`} aria-label="Estado del trabajo de los agentes">
       <header>
         <div>
           <span>{campaignId ? "PIPELINE DE LA CAMPAÑA" : "PIPELINE DEL EQUIPO"}</span>
-          <h3>{snapshot.busy ? "Los agentes están trabajando" : working.length ? "Esperando una decisión humana" : "Sin trabajo en curso"}</h3>
+          <h3>{headline(snapshot, waitingStages.length > 0)}</h3>
         </div>
         <p className="pipeline-summary">
-          {snapshot.totals.completed} completadas · {snapshot.totals.active} en curso
-          {snapshot.totals.failed > 0 && <> · <b className="pipeline-failed">{snapshot.totals.failed} fallidas</b></>}
+          {plural(snapshot.totals.completed, "tarea lista", "tareas listas")}
+          {snapshot.totals.active > 0 && <> · {plural(snapshot.totals.active, "en curso", "en curso")}</>}
+          {snapshot.totals.failed > 0 && <> · <b className="pipeline-failed">{plural(snapshot.totals.failed, "falló", "fallaron")}</b></>}
           {stale && <> · <span className="pipeline-stale">sin actualizar</span></>}
         </p>
       </header>
 
-      <svg className="pipeline-canvas" viewBox="0 0 900 270" role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-        <Row stages={strategy} xs={STRATEGY_X} y={STRATEGY_Y} phase="ESTRATEGIA" />
-        <Row stages={content} xs={CONTENT_X} y={CONTENT_Y} phase="CONTENIDO" />
-      </svg>
-
-      {/* The single most useful line on the page while something is happening: who has the work
-          and what exactly they are on, in their own words from the task title. */}
-      {working.length > 0 ? (
+      {/* What is happening in full words. The rail has room for a state, not for a task title. */}
+      {(busyStages.length > 0 || waitingStages.length > 0) && (
         <ul className="pipeline-now">
-          {working.map((stage) => (
+          {[...busyStages, ...waitingStages].map((stage) => (
             <li key={stage.key} className={stage.taskType ? "is-agent" : "is-human"}>
               <span className="pipeline-now-avatar">{initials(stage.agentName)}</span>
               <div>
                 <strong>{stage.agentName}</strong>
                 <p>{stage.currentTitle ?? stage.workingLabel}</p>
               </div>
-              {stage.active > 1 && <span className="pipeline-now-count">{stage.active}</span>}
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="pipeline-idle">
-          Nadie está ejecutando nada en este momento. El trabajo arranca cuando vos lo pedís desde una campaña.
-        </p>
       )}
 
-      {/* The full map, including the stages with nothing in them. This is the accessible carrier
-          of the whole picture and the only one left once the drawing is hidden on a phone, so it
-          is never collapsed behind a disclosure. */}
-      <ol className="pipeline-list">
-        {snapshot.stages.map((stage) => (
-          <li key={stage.key} className={`is-${visualStateOf(stage)}`}>
-            <span className="pipeline-list-agent">{stage.agentName}</span>
-            <span className="pipeline-list-stage">{stage.label}</span>
-            <span className="pipeline-list-state">
-              {stage.status === "working" ? stage.currentTitle ?? stage.workingLabel : stage.status === "done" ? `${stage.completed} completadas` : "Idle"}
-            </span>
-            {stage.failed > 0 && <span className="pipeline-list-failed">{stage.failed} fallidas</span>}
-          </li>
-        ))}
-      </ol>
+      <Phase title="Estrategia" caption="deciden qué vale la pena hacer" stages={strategy} />
+      <Phase title="Contenido" caption="lo convierten en piezas y te lo traen" stages={content} />
     </section>
   );
 }
