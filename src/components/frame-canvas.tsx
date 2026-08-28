@@ -1,6 +1,7 @@
 "use client";
+import { useId } from "react";
 import type { BrandIdentity } from "@/server/media/identity";
-import type { FrameSpec } from "@/server/media/spec";
+import { gradientVector, isGradient, type Fill, type FrameSpec } from "@/server/media/spec";
 
 // The browser renderer for a composed frame.
 //
@@ -13,6 +14,21 @@ import type { FrameSpec } from "@/server/media/spec";
 // asset that will eventually be exported.
 
 export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; identity: BrandIdentity; className?: string }) {
+  // Gradient ids must be unique across the document: two frames on one page would otherwise
+  // define the same id and the second would silently take the first one's colours.
+  const scope = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const gradients: Array<{ id: string; fill: Fill }> = [];
+
+  const paint = (fill: Fill): string => {
+    if (!isGradient(fill)) return fill;
+    const id = `${scope}g${gradients.length}`;
+    gradients.push({ id, fill });
+    return `url(#${id})`;
+  };
+
+  const background = paint(spec.background);
+  const painted = spec.blocks.map((block) => ({ block, fill: block.kind === "text" ? block.fill : paint(block.fill) }));
+
   return (
     <svg
       className={className}
@@ -22,10 +38,27 @@ export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; id
       role="img"
       aria-label={spec.label}
     >
-      <rect width={spec.width} height={spec.height} fill={spec.background} />
-      {spec.blocks.map((block, index) => {
+      <defs>
+        {gradients.map(({ id, fill }) => {
+          if (!isGradient(fill)) return null;
+          const { x1, y1, x2, y2 } = gradientVector(fill.angle);
+          return (
+            <linearGradient key={id} id={id} x1={x1} y1={y1} x2={x2} y2={y2}>
+              <stop offset="0" stopColor={fill.from} />
+              <stop offset="1" stopColor={fill.to} />
+            </linearGradient>
+          );
+        })}
+      </defs>
+
+      <rect width={spec.width} height={spec.height} fill={background} />
+
+      {painted.map(({ block, fill }, index) => {
         if (block.kind === "rect") {
-          return <rect key={index} x={block.x} y={block.y} width={block.width} height={block.height} rx={block.radius} fill={block.fill} opacity={block.opacity} />;
+          return <rect key={index} x={block.x} y={block.y} width={block.width} height={block.height} rx={block.radius} fill={fill as string} opacity={block.opacity} />;
+        }
+        if (block.kind === "ellipse") {
+          return <ellipse key={index} cx={block.cx} cy={block.cy} rx={block.rx} ry={block.ry} fill={fill as string} opacity={block.opacity} />;
         }
         return (
           <text
@@ -34,6 +67,7 @@ export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; id
             fontSize={block.size}
             fontWeight={block.weight}
             fill={block.fill}
+            opacity={block.opacity}
             letterSpacing={block.letterSpacing}
             textAnchor={block.align === "center" ? "middle" : "start"}
           >

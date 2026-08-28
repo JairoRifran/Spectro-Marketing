@@ -1,26 +1,31 @@
 import type { PlatformContentVariant } from "../content/schemas/variant";
 import { canvasFor, contentBox, type Canvas } from "./canvas";
 import { SPECTRO_IDENTITY, type BrandIdentity } from "./identity";
+import { mix, readableOn, seedOf, shift } from "./palette";
 import type { FrameBlock, FrameSpec } from "./spec";
 import { measure, wrapClamped } from "./text";
 
 // Composition: from a validated variant to the frames that make up the piece.
 //
-// Deliberately deterministic and free. Carousel slides, story frames and a Short's cover are
-// typography over a brand surface — no model is needed to place a headline, and using one would
-// cost money per render, produce a different result every time and be impossible to test. This
-// covers most of what "the covers" means; generative imagery is for the photographic work that
-// typography genuinely cannot do, and plugs in beside this rather than replacing it.
+// Deliberately deterministic and free. A carousel slide, a story beat and a Short's cover are
+// typography over a designed surface — a model would cost money per render, return something
+// different every time and be impossible to test. Generative imagery belongs beside this, for
+// the photographic work typography genuinely cannot do, not in front of it.
 //
-// Everything here is a pure function of (variant, identity), so the same piece always composes
-// to the same frames. That is what makes the output cacheable, diffable and testable.
+// Everything is a pure function of (variant, identity), so the same piece always composes to the
+// same frames. Decoration varies by frame key rather than by chance: a carousel's slides look
+// like one set without being identical, and every render of a slide is the same picture.
+//
+// Two rules the tests hold to. Text stays inside the safe area, because outside it the platform's
+// own interface sits on top. Decoration may reach the edges, because that is what decoration is
+// for, and confining it to the text box would leave every frame with a permanent border.
 
-const HEADLINE_SIZES = [96, 84, 72, 62, 54, 46];
+const HEADLINE_SIZES = [104, 92, 80, 68, 58, 48];
 const BODY_SIZES = [44, 40, 36, 32];
+const EYEBROW_SIZE = 26;
 
 interface Cursor {
   y: number;
-  /** The last y a block may occupy. Nothing is allowed to be drawn past it. */
   bottom: number;
   blocks: FrameBlock[];
   truncated: boolean;
@@ -29,10 +34,9 @@ interface Cursor {
 /**
  * Lays text into whatever vertical room is actually left.
  *
- * Clamping each block to its own line budget is not enough: three blocks that each respect
- * their own limit still stack past the bottom of the frame. So the line budget is the smaller
- * of what the block asked for and what the remaining height can hold, and the size is the
- * largest candidate that satisfies both.
+ * Clamping each block to its own line budget is not enough: three blocks that each respect their
+ * own limit still stack past the bottom of the frame. So the budget is the smaller of what the
+ * block asked for and what the remaining height can hold.
  */
 function layout(text: string, width: number, remaining: number, sizes: number[], maxLines: number, ratio: number) {
   const ordered = [...sizes].sort((a, b) => b - a);
@@ -42,11 +46,8 @@ function layout(text: string, width: number, remaining: number, sizes: number[],
     if (fits < 1) continue;
     const budget = Math.min(maxLines, fits);
     const wrapped = wrapClamped(text, width, size, budget);
-    if (wrapped.lines.length <= budget && !wrapped.truncated) {
-      return { size, lineHeight, ...wrapped };
-    }
+    if (wrapped.lines.length <= budget && !wrapped.truncated) return { size, lineHeight, ...wrapped };
   }
-  // Nothing fitted cleanly: use the smallest size and keep only the lines there is room for.
   const size = ordered[ordered.length - 1];
   const lineHeight = Math.round(size * ratio);
   const fits = Math.floor(remaining / lineHeight);
@@ -54,78 +55,112 @@ function layout(text: string, width: number, remaining: number, sizes: number[],
   return { size, lineHeight, ...wrapClamped(text, width, size, Math.min(maxLines, fits)) };
 }
 
-function heading(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, identity: BrandIdentity, maxLines: number) {
-  const { size, lineHeight, lines, truncated } = layout(text, box.width, cursor.bottom - cursor.y, HEADLINE_SIZES, maxLines, 1.14);
+function heading(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, colour: string, maxLines: number) {
+  const { size, lineHeight, lines, truncated } = layout(text, box.width, cursor.bottom - cursor.y, HEADLINE_SIZES, maxLines, 1.12);
   cursor.truncated = cursor.truncated || truncated;
   if (lines.length === 0) return;
   cursor.blocks.push({
     kind: "text", x: box.x, y: cursor.y + size, lines, size, lineHeight,
-    weight: 750, fill: identity.ink, align: "left", letterSpacing: -size * 0.02,
+    weight: 800, fill: colour, align: "left", letterSpacing: -size * 0.028, opacity: 1,
   });
   cursor.y += lineHeight * lines.length;
 }
 
-function paragraph(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, identity: BrandIdentity, maxLines: number) {
-  const gap = 28;
-  const { size, lineHeight, lines, truncated } = layout(text, box.width, cursor.bottom - cursor.y - gap, BODY_SIZES, maxLines, 1.42);
+function paragraph(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, colour: string, maxLines: number) {
+  const gap = 30;
+  const { size, lineHeight, lines, truncated } = layout(text, box.width, cursor.bottom - cursor.y - gap, BODY_SIZES, maxLines, 1.45);
   cursor.truncated = cursor.truncated || truncated;
   if (lines.length === 0) return;
   cursor.y += gap;
   cursor.blocks.push({
     kind: "text", x: box.x, y: cursor.y + size, lines, size, lineHeight,
-    weight: 400, fill: identity.muted, align: "left", letterSpacing: 0,
+    weight: 400, fill: colour, align: "left", letterSpacing: 0, opacity: 0.88,
   });
   cursor.y += lineHeight * lines.length;
 }
 
-/** A small label at the top of the frame: which slide this is, or what the beat does. */
-function eyebrow(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, identity: BrandIdentity) {
-  const size = 26;
-  const spacing = size * 0.12;
-  // Uppercased here rather than at render time: a label measured in lower case and drawn in
-  // capitals is measured wrong, and capitals are wider.
-  const label = wrapClamped(text.toLocaleUpperCase("es"), box.width, size, 1, spacing).lines[0] ?? "";
+/** A rule and a label. Small, wide-tracked, and the only uppercase on the frame. */
+function eyebrow(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, accent: string) {
+  const spacing = EYEBROW_SIZE * 0.14;
+  const label = wrapClamped(text.toLocaleUpperCase("es"), box.width - 90, EYEBROW_SIZE, 1, spacing).lines[0] ?? "";
+  cursor.blocks.push({ kind: "rect", x: box.x, y: cursor.y + 10, width: 64, height: 6, fill: accent, radius: 3, opacity: 1 });
   cursor.blocks.push({
-    kind: "rect", x: box.x, y: cursor.y, width: 56, height: 5, fill: identity.accent, radius: 3, opacity: 1,
+    kind: "text", x: box.x + 84, y: cursor.y + EYEBROW_SIZE, lines: [label], size: EYEBROW_SIZE,
+    lineHeight: EYEBROW_SIZE, weight: 700, fill: accent, align: "left", letterSpacing: spacing, opacity: 1,
   });
-  cursor.y += 30;
-  cursor.blocks.push({
-    kind: "text", x: box.x, y: cursor.y + size, lines: [label], size, lineHeight: Math.round(size * 1.3),
-    weight: 700, fill: identity.accent, align: "left", letterSpacing: spacing,
-  });
-  cursor.y += Math.round(size * 1.3) + 18;
+  cursor.y += EYEBROW_SIZE + 34;
 }
 
 /**
- * The step marker a carousel needs so a reader knows there is more. It sits inside the content
- * box like everything else: one rule — nothing is drawn outside it — is worth more than a
- * decorative exception nobody remembers when the safe area changes.
+ * The surface a frame is built on: a gradient plus two soft shapes placed from the frame's own
+ * key. It is what turns a slide from words on a flat rectangle into something designed, and it
+ * costs nothing because it is arithmetic rather than a model.
  */
-function counter(canvas: Canvas, position: number, total: number, identity: BrandIdentity): FrameBlock[] {
-  const size = 26;
-  const box = contentBox(canvas);
-  const label = `${position}/${total}`;
-  return [
-    { kind: "text", x: box.x + box.width - measure(label, size), y: box.y + box.height, lines: [label], size,
-      lineHeight: size, weight: 700, fill: identity.muted, align: "left", letterSpacing: 0 },
+function surface(canvas: Canvas, identity: BrandIdentity, key: string, emphatic: boolean): { background: FrameSpec["background"]; blocks: FrameBlock[] } {
+  const seed = seedOf(key);
+  const tinted = mix(identity.surface, identity.accent, emphatic ? 0.22 : 0.1);
+  const background = { from: shift(tinted, 0.06), to: shift(identity.surface, -0.12), angle: 145 };
+
+  const bigRadius = canvas.width * (emphatic ? 0.85 : 0.7);
+  const blocks: FrameBlock[] = [
+    {
+      kind: "ellipse",
+      cx: canvas.width * (0.15 + (seed % 70) / 100),
+      cy: canvas.height * (0.08 + ((seed >> 3) % 20) / 100),
+      rx: bigRadius, ry: bigRadius * 0.72,
+      fill: { from: identity.accent, to: shift(identity.accent, -0.4), angle: (seed % 4) * 90 },
+      opacity: emphatic ? 0.3 : 0.16,
+    },
+    {
+      kind: "ellipse",
+      cx: canvas.width * (0.2 + ((seed >> 5) % 60) / 100),
+      cy: canvas.height * (0.82 + ((seed >> 7) % 15) / 100),
+      rx: canvas.width * 0.55, ry: canvas.width * 0.4,
+      fill: shift(identity.accent, 0.25),
+      opacity: 0.12,
+    },
   ];
+  return { background, blocks };
 }
 
-function frame(key: string, label: string, canvas: Canvas, identity: BrandIdentity, build: (cursor: Cursor, box: ReturnType<typeof contentBox>) => void, extra: FrameBlock[] = []): FrameSpec {
+/** The step marker a carousel needs, set inside the content box like everything else. */
+function counter(canvas: Canvas, position: number, total: number, colour: string): FrameBlock[] {
+  const size = 28;
   const box = contentBox(canvas);
+  const label = `${position}/${total}`;
+  return [{
+    kind: "text", x: box.x + box.width - measure(label, size), y: box.y + box.height, lines: [label],
+    size, lineHeight: size, weight: 700, fill: colour, align: "left", letterSpacing: 0, opacity: 0.7,
+  }];
+}
+
+function frame(
+  key: string,
+  label: string,
+  canvas: Canvas,
+  identity: BrandIdentity,
+  emphatic: boolean,
+  build: (cursor: Cursor, box: ReturnType<typeof contentBox>, ink: string, accent: string) => void,
+  extra: (ink: string) => FrameBlock[] = () => [],
+): FrameSpec {
+  const box = contentBox(canvas);
+  const { background, blocks: decoration } = surface(canvas, identity, key, emphatic);
+  // What is readable on the tinted surface is checked rather than assumed: a pale brand accent
+  // can make the usual ink unreadable, and that only shows up once somebody opens the file.
+  const tinted = mix(identity.surface, identity.accent, emphatic ? 0.22 : 0.1);
+  const ink = readableOn(tinted, identity);
+  const accent = identity.accent === ink ? shift(identity.accent, 0.35) : identity.accent;
+
   const cursor: Cursor = { y: box.y, bottom: box.y + box.height, blocks: [], truncated: false };
-  build(cursor, box);
+  build(cursor, box, ink, accent);
+
   return {
-    key, label, width: canvas.width, height: canvas.height,
-    background: identity.surface, blocks: [...cursor.blocks, ...extra], truncated: cursor.truncated,
+    key, label, width: canvas.width, height: canvas.height, background,
+    blocks: [...decoration, ...cursor.blocks, ...extra(ink)],
+    truncated: cursor.truncated,
   };
 }
 
-/**
- * Every frame a variant needs, in reading order. A video contributes its cover: the opening
- * frame is the only still that decides whether the rest is watched, so it is worth designing
- * even while the video itself is not being produced.
- */
 export function composeFrames(variant: PlatformContentVariant, identity: BrandIdentity = SPECTRO_IDENTITY): FrameSpec[] {
   const canvas = canvasFor(variant.platform, variant.format);
   const detail = variant.detail;
@@ -136,53 +171,58 @@ export function composeFrames(variant: PlatformContentVariant, identity: BrandId
       ...detail.carousel.slides.map((slide, index) => ({ ...slide, kind: `Lámina ${index + 2}` })),
       { ...detail.carousel.ctaSlide, kind: "Cierre" },
     ];
-    return slides.map((slide, index) => frame(
-      `slide-${index}`, slide.kind, canvas, identity,
-      (cursor, box) => {
-        eyebrow(cursor, slide.kind, box, identity);
-        heading(cursor, slide.headline, box, identity, index === 0 ? 4 : 3);
-        if (slide.body) paragraph(cursor, slide.body, box, identity, 5);
-      },
-      counter(canvas, index + 1, slides.length, identity),
-    ));
+    return slides.map((slide, index) => {
+      // The cover and the closing slide carry the emphasis; the middle stays calm so the set
+      // reads as a sequence rather than as five competing posters.
+      const isEdge = index === 0 || index === slides.length - 1;
+      return frame(
+        `slide-${index}`, slide.kind, canvas, identity, isEdge,
+        (cursor, box, ink, accent) => {
+          eyebrow(cursor, slide.kind, box, accent);
+          heading(cursor, slide.headline, box, ink, index === 0 ? 4 : 3);
+          if (slide.body) paragraph(cursor, slide.body, box, ink, 5);
+        },
+        (ink) => counter(canvas, index + 1, slides.length, ink),
+      );
+    });
   }
 
   if (detail.shape === "story") {
     return detail.story.frames.map((storyFrame, index) => frame(
-      `story-${index}`, `Story ${index + 1} · ${storyFrame.role}`, canvas, identity,
-      (cursor, box) => {
-        eyebrow(cursor, storyFrame.role, box, identity);
-        heading(cursor, storyFrame.text, box, identity, 5);
+      `story-${index}`, `Story ${index + 1} · ${storyFrame.role}`, canvas, identity, index === 0,
+      (cursor, box, ink, accent) => {
+        eyebrow(cursor, storyFrame.role, box, accent);
+        heading(cursor, storyFrame.text, box, ink, 5);
       },
     ));
   }
 
   if (detail.shape === "video") {
     // The cover, plus a title card per scene that carries burnt-in text. Scenes without any
-    // on-screen text get no card: there is nothing to typeset, and an invented one would be
-    // a caption nobody wrote.
-    const cover = frame("cover", "Portada", canvas, identity, (cursor, box) => {
-      eyebrow(cursor, "Apertura", box, identity);
-      heading(cursor, detail.script.hook, box, identity, 5);
+    // on-screen text get no card: there is nothing to typeset, and an invented one would be a
+    // caption nobody wrote.
+    const cover = frame("cover", "Portada", canvas, identity, true, (cursor, box, ink, accent) => {
+      eyebrow(cursor, "Apertura", box, accent);
+      heading(cursor, detail.script.hook, box, ink, 5);
     });
     const cards = detail.script.scenes
       .map((scene, index) => ({ scene, index }))
       .filter(({ scene }) => Boolean(scene.onScreenText))
       .map(({ scene, index }) => frame(
-        `scene-${index}`, `Escena ${index + 1}`, canvas, identity,
-        (cursor, box) => {
-          eyebrow(cursor, `Escena ${index + 1}`, box, identity);
-          heading(cursor, scene.onScreenText!, box, identity, 4);
+        `scene-${index}`, `Escena ${index + 1}`, canvas, identity, false,
+        (cursor, box, ink, accent) => {
+          eyebrow(cursor, `Escena ${index + 1}`, box, accent);
+          heading(cursor, scene.onScreenText!, box, ink, 4);
         },
       ));
     return [cover, ...cards];
   }
 
   if (detail.shape === "static") {
-    return [frame("post", "Pieza", canvas, identity, (cursor, box) => {
-      eyebrow(cursor, "Pieza", box, identity);
-      heading(cursor, detail.post.headline, box, identity, 5);
-      if (detail.post.onScreenText.length > 0) paragraph(cursor, detail.post.onScreenText.join(" · "), box, identity, 3);
+    return [frame("post", "Pieza", canvas, identity, true, (cursor, box, ink, accent) => {
+      eyebrow(cursor, "Pieza", box, accent);
+      heading(cursor, detail.post.headline, box, ink, 5);
+      if (detail.post.onScreenText.length > 0) paragraph(cursor, detail.post.onScreenText.join(" · "), box, ink, 3);
     })];
   }
 

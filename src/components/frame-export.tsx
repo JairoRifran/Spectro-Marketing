@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { BrandIdentity } from "@/server/media/identity";
-import type { FrameSpec } from "@/server/media/spec";
+import { gradientVector, isGradient, type Fill, type FrameSpec } from "@/server/media/spec";
 import type { PlatformContentVariant } from "@/server/content/schemas/variant";
 import { createZip, safeEntryName, type ZipEntry } from "@/lib/zip";
 
@@ -19,6 +19,22 @@ import { createZip, safeEntryName, type ZipEntry } from "@/lib/zip";
 // The third renderer from one spec. Coordinates and line breaks come from composition, so the
 // PNG cannot disagree with the preview about where anything sits.
 
+/**
+ * A fill as canvas understands it. The gradient's direction comes from the same shared vector
+ * the other two renderers use, so a gradient points the same way in the preview and in the file.
+ */
+function toCanvasFill(context: CanvasRenderingContext2D, fill: Fill, box: { x: number; y: number; width: number; height: number }) {
+  if (!isGradient(fill)) return fill;
+  const { x1, y1, x2, y2 } = gradientVector(fill.angle);
+  const gradient = context.createLinearGradient(
+    box.x + x1 * box.width, box.y + y1 * box.height,
+    box.x + x2 * box.width, box.y + y2 * box.height,
+  );
+  gradient.addColorStop(0, fill.from);
+  gradient.addColorStop(1, fill.to);
+  return gradient;
+}
+
 function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = spec.width;
@@ -26,12 +42,13 @@ function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement 
   const context = canvas.getContext("2d");
   if (!context) throw new Error("canvas_unavailable");
 
-  context.fillStyle = spec.background;
+  const full = { x: 0, y: 0, width: spec.width, height: spec.height };
+  context.fillStyle = toCanvasFill(context, spec.background, full);
   context.fillRect(0, 0, spec.width, spec.height);
 
   for (const block of spec.blocks) {
     if (block.kind === "rect") {
-      context.fillStyle = block.fill;
+      context.fillStyle = toCanvasFill(context, block.fill, block);
       context.globalAlpha = block.opacity;
       if (block.radius > 0 && typeof context.roundRect === "function") {
         context.beginPath();
@@ -44,8 +61,21 @@ function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement 
       continue;
     }
 
+    if (block.kind === "ellipse") {
+      context.fillStyle = toCanvasFill(context, block.fill, {
+        x: block.cx - block.rx, y: block.cy - block.ry, width: block.rx * 2, height: block.ry * 2,
+      });
+      context.globalAlpha = block.opacity;
+      context.beginPath();
+      context.ellipse(block.cx, block.cy, block.rx, block.ry, 0, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 1;
+      continue;
+    }
+
     context.font = `${block.weight} ${block.size}px ${identity.fontFamily}`;
     context.fillStyle = block.fill;
+    context.globalAlpha = block.opacity;
     context.textAlign = block.align === "center" ? "center" : "left";
     context.textBaseline = "alphabetic";
     // Not universally supported; without it the frame is still correct, just a little tighter.
@@ -54,6 +84,7 @@ function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement 
       context.fillText(line, block.x, block.y + index * block.lineHeight);
     });
     if ("letterSpacing" in context) context.letterSpacing = "0px";
+    context.globalAlpha = 1;
   }
 
   return canvas;

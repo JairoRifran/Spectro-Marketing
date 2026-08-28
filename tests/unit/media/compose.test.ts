@@ -155,9 +155,10 @@ describe("composition", () => {
     expect(composeFrames(variantFor("linkedin", "text_post"))).toEqual([]);
   });
 
-  // One rule, everywhere: nothing is drawn outside the content box. Not "inside the canvas" —
-  // the box is what accounts for the interface the platform lays over the frame.
-  it("keeps every drawn block inside the content box on every platform", () => {
+  // Text stays inside the safe area, because outside it the platform's own interface sits on
+  // top. Decoration is held to the canvas instead: confining it to the text box would leave
+  // every frame with a permanent border, which is not a design, it is a bug with margins.
+  it("keeps every line of text inside the content box on every platform", () => {
     for (const platform of SUPPORTED_PLATFORMS) {
       for (const format of CONTENT_FORMATS) {
         if (!supportsFormat(platform, format)) continue;
@@ -168,12 +169,8 @@ describe("composition", () => {
         for (const frame of composeFrames(variant)) {
           for (const block of frame.blocks) {
             const where = `${platform}/${format}`;
+            if (block.kind !== "text") continue;
             expect(block.x, `${where} starts left of the box`).toBeGreaterThanOrEqual(box.x);
-            if (block.kind === "rect") {
-              expect(block.x + block.width, `${where} rect too wide`).toBeLessThanOrEqual(box.x + box.width);
-              expect(block.y + block.height, `${where} rect below the box`).toBeLessThanOrEqual(box.y + box.height);
-              continue;
-            }
             const widest = Math.max(...block.lines.map((line) => measure(line, block.size, block.letterSpacing)));
             expect(block.x + widest, `${where} text too wide`).toBeLessThanOrEqual(box.x + box.width);
             const bottom = block.y + (block.lines.length - 1) * block.lineHeight;
@@ -204,7 +201,7 @@ describe("svg rendering", () => {
     const frame = composeFrames(variantFor("instagram", "carousel"))[0];
     const hostile = {
       ...frame,
-      blocks: [{ kind: "text" as const, x: 10, y: 10, lines: ["</text><script>alert(1)</script>"], size: 40, lineHeight: 48, weight: 400, fill: "#ffffff", align: "left" as const, letterSpacing: 0, uppercase: false }],
+      blocks: [{ kind: "text" as const, x: 10, y: 10, lines: ["</text><script>alert(1)</script>"], size: 40, lineHeight: 48, weight: 400, fill: "#ffffff", align: "left" as const, letterSpacing: 0, opacity: 1 }],
     };
     const svg = renderFrameSvg(hostile, SPECTRO_IDENTITY);
     expect(svg).not.toContain("<script>");
@@ -226,6 +223,45 @@ describe("svg rendering", () => {
 // The adapter answers a request with the shape it can actually deliver — asking Instagram for a
 // story yields a carousel. Composition has to follow the produced format, because sizing a frame
 // from the requested one silently renders at the wrong dimensions.
+describe("decoration", () => {
+  it("stays within the canvas, so no shape is drawn entirely off the edge", () => {
+    for (const platform of SUPPORTED_PLATFORMS) {
+      for (const format of CONTENT_FORMATS) {
+        if (!supportsFormat(platform, format)) continue;
+        const variant = variantFor(platform, format);
+        for (const frame of composeFrames(variant)) {
+          for (const block of frame.blocks) {
+            if (block.kind !== "ellipse") continue;
+            const where = `${platform}/${format}`;
+            expect(block.cx, `${where} shape centred off the canvas`).toBeGreaterThan(0);
+            expect(block.cx, where).toBeLessThan(frame.width);
+            expect(block.cy, where).toBeGreaterThan(0);
+            expect(block.cy, where).toBeLessThan(frame.height);
+            // Barely visible is worse than absent: it reads as a rendering fault.
+            expect(block.opacity, `${where} shape invisible`).toBeGreaterThan(0.05);
+          }
+        }
+      }
+    }
+  });
+
+  it("gives a frame more than words on a flat rectangle", () => {
+    const frames = composeFrames(variantFor("instagram", "carousel"));
+    for (const frame of frames) {
+      expect(typeof frame.background, "a flat background is the thing this replaced").not.toBe("string");
+      expect(frame.blocks.some((block) => block.kind === "ellipse")).toBe(true);
+    }
+  });
+
+  it("varies between slides while staying deterministic", () => {
+    // A set, not five copies — and the same slide twice is the same picture.
+    const frames = composeFrames(variantFor("instagram", "carousel"));
+    const shapes = frames.map((frame) => JSON.stringify(frame.blocks.filter((block) => block.kind === "ellipse")));
+    expect(new Set(shapes).size).toBeGreaterThan(1);
+    expect(composeFrames(variantFor("instagram", "carousel"))).toEqual(frames);
+  });
+});
+
 describe("canvas follows the produced format", () => {
   it("sizes the frame from what the adapter delivered, not what was asked for", () => {
     for (const platform of SUPPORTED_PLATFORMS) {
