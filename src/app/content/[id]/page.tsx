@@ -10,8 +10,8 @@ import { accountFor } from "@/features/content/account";
 import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { PreviewTabs } from "@/components/preview-tabs";
-import { VoiceoverAction } from "@/components/voiceover-action";
-import { getVoiceoverPreflight } from "@/features/media/voiceover-preflight";
+import { SoundActions } from "@/components/sound-actions";
+import { getSoundPreflight } from "@/features/media/sound-preflight";
 import { AssembledPreview } from "@/components/assembled-preview";
 import { intendedTimings } from "@/server/media/timing";
 import { getContentDetail } from "@/features/content/data";
@@ -33,7 +33,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
   const query = await searchParams;
   const data = await getContentDetail(id, Number(query.v) || undefined);
   if (!data) notFound();
-  const voiceover = await getVoiceoverPreflight(id, data.selectedVersion, data.variant?.payload ?? null);
+  const sound = await getSoundPreflight(id, data.selectedVersion, data.variant?.payload ?? null, (data.concept as Record<string, string>).pillar ?? "");
 
   const item = data.item;
   const concept = data.concept as Record<string, string>;
@@ -83,11 +83,11 @@ export default async function ContentDetailPage({ params, searchParams }: { para
                     frames={frames}
                     timings={intendedTimings(variant.payload, frames)}
                     identity={SPECTRO_IDENTITY}
-                    audioUrl={voiceover.existing?.url ?? null}
+                    audioUrl={sound.voice.existing?.url ?? null}
                     label={item.title}
                   />
                 ) : undefined}
-                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={voiceover.existing?.url ? { url: voiceover.existing.url, mimeType: "audio/mpeg" } : null} />}
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={sound.voice.existing?.url ? { url: sound.voice.existing.url, mimeType: "audio/mpeg" } : null} />}
                 production={<ContentPreview variant={variant.payload} />}
               />
             ) : <p className="panel-empty">Todavía no hay una versión escrita.</p>}
@@ -116,9 +116,9 @@ export default async function ContentDetailPage({ params, searchParams }: { para
           )}
 
           <section className="detail-panel">
-            <span className="section-kicker">VOZ EN OFF</span>
+            <span className="section-kicker">AUDIO</span>
             <h3>Cómo va a sonar</h3>
-            <VoiceoverAction contentItemId={id} demo={data.mode === "demo"} preflight={voiceover} />
+            <SoundActions contentItemId={id} demo={data.mode === "demo"} preflight={sound} />
           </section>
 
           <section className="detail-panel">

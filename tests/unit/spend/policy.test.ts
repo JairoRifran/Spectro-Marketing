@@ -115,7 +115,7 @@ describe("estimation", () => {
   it("counts a character, not a code unit", () => {
     // An emoji is two UTF-16 code units; billing it as two would misprice every caption.
     expect([..."👋"].length).toBe(1);
-    expect(estimateCost({ operation: "media.tts", text: "👋" }, { ttsPerCharacterMicros: 100, minimumChargeMicros: 0 })).toBe(100);
+    expect(estimateCost({ operation: "media.tts", text: "👋" }, { ttsPerCharacterMicros: 100, sfxPerSecondMicros: 0, musicPerSecondMicros: 0, minimumChargeMicros: 0 })).toBe(100);
   });
 
   it("applies a floor, so a tiny request is not treated as free", () => {
@@ -123,7 +123,7 @@ describe("estimation", () => {
   });
 
   it("always returns whole micros", () => {
-    const estimate = estimateCost({ operation: "media.tts", text: "una frase cualquiera" }, { ttsPerCharacterMicros: 7, minimumChargeMicros: 0 });
+    const estimate = estimateCost({ operation: "media.tts", text: "una frase cualquiera" }, { ttsPerCharacterMicros: 7, sfxPerSecondMicros: 0, musicPerSecondMicros: 0, minimumChargeMicros: 0 });
     expect(Number.isInteger(estimate)).toBe(true);
   });
 

@@ -90,6 +90,18 @@ export interface AvailableVoice {
   previewUrl?: string;
 }
 
+export const musicRequestSchema = z.object({
+  /** What the music should be. Built from the piece, never a stock description. */
+  prompt: z.string().trim().min(1).max(600),
+  seconds: z.number().min(3).max(600),
+  /**
+   * Always instrumental for a piece that carries a voiceover: a voice and a vocal track compete
+   * for the same attention, and a piece with both is a piece where neither is heard.
+   */
+  instrumental: z.boolean().default(true),
+});
+export type MusicRequest = z.infer<typeof musicRequestSchema>;
+
 export interface MediaProvider {
   readonly name: string;
   /** What this request will be billed for, before it is sent. */
@@ -100,4 +112,9 @@ export interface MediaProvider {
    * every provider will, and pretending otherwise would force a fake implementation.
    */
   listVoices?(): Promise<AvailableVoice[]>;
+  /**
+   * Composes a backing track. Optional for the same reason listing is: a provider that cannot do
+   * it should say so by not having the method, not by returning something it made up.
+   */
+  composeMusic?(request: MusicRequest): Promise<SpeechResult>;
 }

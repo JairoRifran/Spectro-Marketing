@@ -1,4 +1,4 @@
-import { MediaProviderError, speechRequestSchema, type AvailableVoice, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
+import { MediaProviderError, musicRequestSchema, speechRequestSchema, type AvailableVoice, type MediaProvider, type MusicRequest, type SpeechRequest, type SpeechResult } from "./provider";
 import type { Delivery } from "./voice-profile";
 
 // The ElevenLabs adapter.
@@ -18,9 +18,12 @@ import type { Delivery } from "./voice-profile";
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech";
 const VOICES_ENDPOINT = "https://api.elevenlabs.io/v2/voices";
+const MUSIC_ENDPOINT = "https://api.elevenlabs.io/v1/music";
 const MODEL = "eleven_multilingual_v2";
 const OUTPUT_FORMAT = "mp3_44100_128";
 const TIMEOUT_MS = 30_000;
+// Composing takes materially longer than speaking a sentence, so it gets its own patience.
+const MUSIC_TIMEOUT_MS = 120_000;
 
 export interface ElevenLabsConfig {
   apiKey: string;
@@ -147,6 +150,56 @@ export class ElevenLabsProvider implements MediaProvider {
       // with the estimate rather than with a number invented here.
       costMicros: undefined,
       durationSeconds: undefined,
+      providerRef: response.headers.get("request-id") ?? undefined,
+      generatedBy: "provider",
+    };
+  }
+
+  /**
+   * Composes a backing track.
+   *
+   * The vendor takes a length in milliseconds and documents its own bounds; the request is
+   * clamped before it is sent, because a rejected call still costs a round trip and a silently
+   * shortened one would leave the piece with music that ends before the narration does.
+   */
+  async composeMusic(request: MusicRequest): Promise<SpeechResult> {
+    const parsed = musicRequestSchema.safeParse(request);
+    if (!parsed.success) {
+      throw new MediaProviderError("invalid_request", this.name, "La solicitud de musica no es valida.");
+    }
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(MUSIC_ENDPOINT, {
+        method: "POST",
+        headers: { "xi-api-key": this.config.apiKey, "content-type": "application/json", accept: "audio/mpeg" },
+        body: JSON.stringify({
+          prompt: parsed.data.prompt,
+          music_length_ms: Math.round(parsed.data.seconds * 1000),
+          force_instrumental: parsed.data.instrumental,
+        }),
+        signal: AbortSignal.timeout(MUSIC_TIMEOUT_MS),
+      });
+    } catch {
+      throw new MediaProviderError("unavailable", this.name, "No se pudo contactar al proveedor de musica.");
+    }
+
+    if (!response.ok) {
+      const detail = await vendorReason(response, [this.config.apiKey]);
+      throw new MediaProviderError(reasonFor(response.status), this.name, `El proveedor de musica respondio ${response.status}${detail ? `: ${detail}` : "."}`);
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length === 0) {
+      throw new MediaProviderError("unavailable", this.name, "El proveedor de musica devolvio un archivo vacio.");
+    }
+
+    return {
+      bytes,
+      mimeType: response.headers.get("content-type") ?? "audio/mpeg",
+      // The length was requested, so it is known here in a way a speech duration is not.
+      durationSeconds: parsed.data.seconds,
+      costMicros: undefined,
       providerRef: response.headers.get("request-id") ?? undefined,
       generatedBy: "provider",
     };

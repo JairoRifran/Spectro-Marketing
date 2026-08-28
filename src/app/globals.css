@@ -377,3 +377,5 @@
 .voiceover-missing{display:flex;align-items:center;gap:5px;color:#8a5a17;font-size:10px;font-weight:600}
 .voiceover-quick{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#33433f;font-size:9px;font-weight:650}
 .voiceover-quick:disabled{opacity:.6}
+.sound-track+.sound-track{margin-top:14px;padding-top:14px;border-top:1px solid #eef1f0}
+.sound-pending{display:flex;align-items:center;gap:8px}

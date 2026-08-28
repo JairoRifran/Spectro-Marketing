@@ -10,7 +10,8 @@ import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { AssembledPreview } from "@/components/assembled-preview";
 import { intendedTimings } from "@/server/media/timing";
 import { buildNarration } from "@/server/media/narration";
-import { VoiceoverAction } from "@/components/voiceover-action";
+import { buildMusicBrief } from "@/server/media/soundtrack";
+import { SoundActions } from "@/components/sound-actions";
 import { estimateCost, ratesFromEnv } from "@/server/spend/pricing";
 import { formatMoney } from "@/server/spend/money";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
@@ -41,6 +42,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
   const view: ViewMode = filters.view === "feed" ? "feed" : "table";
   const data = await getContentGallery(filters);
   const account = accountFor(data.orgName);
+  const rates = ratesFromEnv(process.env);
   const pages = Math.max(1, Math.ceil(data.total / CONTENT_PAGE_SIZE));
   const pillars = Array.from(new Set(data.items.map((item) => item.pillar))).filter((pillar) => pillar !== "—");
   const agents = Array.from(new Set(data.items.map((item) => item.agentName).filter(Boolean))) as string[];
@@ -118,6 +120,9 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       const variant = item.variant;
                       const frames = composeFrames(variant);
                       const narration = buildNarration(variant);
+                      // Priced with the brand's own tone where there is one; the label only decides
+                      // the character, not the length, so the estimate holds either way.
+                      const musicBrief = buildMusicBrief(variant, "cercana", item.pillar);
                       const playable = frames.length > 1;
                       return (
                         <>
@@ -133,19 +138,28 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                                 audioUrl={item.audioUrl}
                                 label={item.title}
                               />
-                              {narration && (
-                                <VoiceoverAction
-                                  contentItemId={item.id}
-                                  demo={data.mode === "demo"}
-                                  compact
-                                  preflight={{
-                                    hasNarration: true,
-                                    characters: [...narration.text].length,
-                                    estimate: formatMoney(estimateCost({ operation: "media.tts", text: narration.text }, ratesFromEnv(process.env))),
-                                    existing: item.audioUrl ? { durationSeconds: null, generatedBy: "provider", url: item.audioUrl } : null,
-                                  }}
-                                />
-                              )}
+                              <SoundActions
+                                contentItemId={item.id}
+                                demo={data.mode === "demo"}
+                                compact
+                                preflight={{
+                                  voice: narration
+                                    ? {
+                                        possible: true,
+                                        estimate: formatMoney(estimateCost({ operation: "media.tts", text: narration.text }, rates)),
+                                        existing: item.audioUrl ? { durationSeconds: null, generatedBy: "provider", url: item.audioUrl } : null,
+                                      }
+                                    : { possible: false, estimate: null, existing: null },
+                                  music: musicBrief
+                                    ? {
+                                        possible: true,
+                                        estimate: formatMoney(estimateCost({ operation: "media.music", seconds: musicBrief.seconds }, rates)),
+                                        existing: item.musicUrl ? { durationSeconds: null, generatedBy: "provider", url: item.musicUrl } : null,
+                                      }
+                                    : { possible: false, estimate: null, existing: null },
+                                  needsProfile: false,
+                                }}
+                              />
                             </div>
                           )}
                           <PlatformMockup variant={variant} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg" } : null} />

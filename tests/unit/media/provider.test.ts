@@ -104,7 +104,7 @@ describe("billing agrees with what is sent", () => {
 
   it("lines up with what the ceiling is checked against", () => {
     const characters = provider.billedCharacters(request);
-    const rates = { ttsPerCharacterMicros: 10, minimumChargeMicros: 0 };
+    const rates = { ttsPerCharacterMicros: 10, sfxPerSecondMicros: 0, musicPerSecondMicros: 0, minimumChargeMicros: 0 };
     expect(estimateCost({ operation: "media.tts", text: request.text }, rates)).toBe(characters * 10);
   });
 });

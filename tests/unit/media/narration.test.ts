@@ -102,7 +102,7 @@ describe("what gets spoken", () => {
     // Estimating from anything other than what is sent enforces the ceiling against a number
     // unrelated to the invoice.
     const narration = buildNarration(scripted([{ voiceover: "Una linea" }]))!;
-    const rates = { ttsPerCharacterMicros: 10, minimumChargeMicros: 0 };
+    const rates = { ttsPerCharacterMicros: 10, sfxPerSecondMicros: 0, musicPerSecondMicros: 0, minimumChargeMicros: 0 };
     expect(estimateCost({ operation: "media.tts", text: narration.text }, rates)).toBe([...narration.text].length * 10);
   });
 });

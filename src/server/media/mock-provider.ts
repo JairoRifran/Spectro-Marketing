@@ -1,4 +1,4 @@
-import { MediaProviderError, speechRequestSchema, type AvailableVoice, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
+import { MediaProviderError, musicRequestSchema, speechRequestSchema, type AvailableVoice, type MediaProvider, type MusicRequest, type SpeechRequest, type SpeechResult } from "./provider";
 import { durationSeconds, encodeWav, SAMPLE_RATE } from "./wav";
 
 // A provider that costs nothing and produces a file that really plays.
@@ -62,6 +62,39 @@ export class MockMediaProvider implements MediaProvider {
       mimeType: "audio/wav",
       durationSeconds: durationSeconds(samples.length),
       // Costs nothing, and says so rather than leaving the caller to settle with an estimate.
+      costMicros: 0,
+      generatedBy: "mock",
+    };
+  }
+
+  /**
+   * A backing track that is audibly a placeholder.
+   *
+   * Two low tones rather than a beep, so it reads as "music goes here" while being impossible to
+   * mistake for something composed. It runs the full requested length, because a mock that
+   * silently returns something shorter would let the whole assembly path pass tests against a
+   * duration nothing else will ever produce.
+   */
+  async composeMusic(request: MusicRequest): Promise<SpeechResult> {
+    const parsed = musicRequestSchema.safeParse(request);
+    if (!parsed.success) {
+      throw new MediaProviderError("invalid_request", this.name, "La solicitud de musica no es valida.");
+    }
+
+    const seconds = parsed.data.seconds;
+    const count = Math.floor(seconds * SAMPLE_RATE);
+    const samples = new Int16Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const t = index / SAMPLE_RATE;
+      const fade = Math.min(1, index / 4000, (count - index) / 4000);
+      const value = Math.sin(2 * Math.PI * 110 * t) * 0.6 + Math.sin(2 * Math.PI * 165 * t) * 0.4;
+      samples[index] = Math.round(value * 0.12 * fade * 32_767);
+    }
+
+    return {
+      bytes: encodeWav({ samples }),
+      mimeType: "audio/wav",
+      durationSeconds: durationSeconds(samples.length),
       costMicros: 0,
       generatedBy: "mock",
     };

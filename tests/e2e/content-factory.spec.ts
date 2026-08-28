@@ -398,23 +398,26 @@ test("the language filter is built from the voices the account actually has", as
 
 // The first place in Spectro where pressing something spends money, so the money is on screen
 // before the button is.
-test("the cost of a voiceover is shown before it can be produced", async ({ page }) => {
+test("the cost of each track is shown before it can be produced", async ({ page }) => {
   await page.goto("/content/00000000-0000-0000-0000-000000000602");
   const panel = page.locator(".voiceover-action");
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText(/\d+ caracteres/);
-  await expect(panel).toContainText(/costo estimado/);
-  await expect(panel).toContainText(/US\$|\$/);
+
+  // Voice and music are separate decisions with separate prices; one control would hide which.
   await expect(panel.getByRole("button", { name: /Generar voz en off/ })).toBeVisible();
+  await expect(panel.getByRole("button", { name: /Generar música/ })).toBeVisible();
+  expect(await panel.locator(".voiceover-cost").count()).toBe(2);
+  await expect(panel).toContainText(/costo estimado/);
   await expect(panel).toContainText(/Nada se publica/);
 });
 
-test("a piece nobody speaks is not offered a voiceover", async ({ page }) => {
-  // A carousel is read by the person scrolling it. Offering to narrate it would be selling
-  // something nobody asked for.
+test("a piece read in silence is offered neither voice nor music", async ({ page }) => {
+  // A carousel is read by the person scrolling it. Offering to narrate or score it would be
+  // selling something nobody asked for.
   await page.goto("/content/00000000-0000-0000-0000-000000000601");
-  await expect(page.getByText("Esta pieza no lleva voz en off.")).toBeVisible();
+  await expect(page.getByText("Esta pieza no lleva audio.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Generar voz en off/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Generar música/ })).toHaveCount(0);
 });
 
 // The assembled view: the frames in sequence with the voice over them. Not a rendered video and
@@ -453,10 +456,11 @@ test("a playable piece opens ready to play, not behind a disclosure", async ({ p
   await expect(page.locator(".gallery-assembled summary")).toHaveCount(0);
 });
 
-test("a piece without a voice says so, and offers to make one with its cost", async ({ page }) => {
+test("a piece missing audio says which, and offers each with its cost", async ({ page }) => {
   await page.goto("/content?view=feed&platform=tiktok");
   const state = page.locator(".voiceover-compact").first();
   await expect(state).toContainText("Sin voz en off");
-  // The price is on the button: nothing here spends without saying what it spends.
-  await expect(state.getByRole("button", { name: /Generar ·/ })).toBeVisible();
+  await expect(state).toContainText("Sin música");
+  // The price is on every button: nothing here spends without saying what it spends.
+  expect(await state.getByRole("button", { name: /Generar ·/ }).count()).toBe(2);
 });

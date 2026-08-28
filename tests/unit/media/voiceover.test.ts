@@ -37,7 +37,7 @@ const input = {
   idempotencyKey: "req-1",
 };
 
-const rates = { ttsPerCharacterMicros: 10, minimumChargeMicros: 0 };
+const rates = { ttsPerCharacterMicros: 10, sfxPerSecondMicros: 0, musicPerSecondMicros: 0, minimumChargeMicros: 0 };
 
 describe("synthesising a voiceover", () => {
   it("reserves before calling the vendor, and settles after", async () => {
