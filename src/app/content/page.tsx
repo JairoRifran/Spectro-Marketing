@@ -5,6 +5,8 @@ import { FORMAT_LABEL, PLATFORM_LABEL } from "@/components/content-preview";
 import { CONTENT_PAGE_SIZE, getContentGallery, type ContentFilters } from "@/features/content/data";
 import { PlatformMockup } from "@/components/platform-mockup";
 import { accountFor } from "@/features/content/account";
+import { composeFrames } from "@/server/media/compose";
+import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
 import { CONTENT_FORMATS } from "@/server/content/platforms";
 
@@ -107,7 +109,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       <StatusPill value={item.status} />
                     </header>
                     {item.variant
-                      ? <PlatformMockup variant={item.variant} account={account} />
+                      ? <PlatformMockup variant={item.variant} account={account} frames={composeFrames(item.variant)} identity={SPECTRO_IDENTITY} />
                       : <p className="panel-empty">Planificada, todavía sin escribir.</p>}
                   </article>
                 ))}

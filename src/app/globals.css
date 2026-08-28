@@ -286,3 +286,16 @@
 .gallery-card>header a:hover{text-decoration:underline}
 .gallery-card>header small{display:block;margin-top:3px;color:#8b9592;font-size:9px}
 @media(max-width:900px){.content-gallery{grid-template-columns:1fr}}
+
+/* A composed frame is the picture itself, so it fills its container and the chrome sits over it. */
+.mock-media.is-composed{padding:0;background:none;display:block;position:relative}
+.mock-media.is-composed svg{display:block;width:100%;height:100%}
+.mock-media-warn{position:absolute;left:10px;bottom:10px;padding:3px 8px;border-radius:5px;background:#8a5a17;color:#fff;font-size:9px;font-weight:650}
+.mock-frame.has-art{padding:0}
+.mock-frame-art{position:absolute;inset:0}
+.mock-frame-art svg{display:block;width:100%;height:100%}
+.mock-frame.has-art .mock-rail,.mock-frame.has-art .mock-vertical-foot,.mock-frame.has-art .mock-voiceover{position:relative;z-index:1}
+.mock-frame.has-art .mock-vertical-foot{margin-top:auto;padding:0 46px 14px 14px}
+.mock-frame.has-art .mock-voiceover{padding:14px 46px 0 14px}
+.mock-frame.is-story .mock-frame-art{inset:0}
+.mock-frame.is-story .mock-handle,.mock-frame.is-story .mock-story-role{position:relative;z-index:1}

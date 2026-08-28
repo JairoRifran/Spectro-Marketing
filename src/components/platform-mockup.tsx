@@ -2,8 +2,11 @@
 import { useState, type ReactNode } from "react";
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Music2, Repeat2, Send, ThumbsUp, Volume2 } from "lucide-react";
 import type { PlatformContentVariant } from "@/server/content/schemas/variant";
+import type { FrameSpec } from "@/server/media/spec";
 import type { MockAccount } from "@/features/content/account";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
+import { FrameCanvas } from "./frame-canvas";
+import type { BrandIdentity } from "@/server/media/identity";
 
 // What the piece will look like where it lands.
 //
@@ -54,14 +57,23 @@ function Caption({ text, limit }: { text: string; limit: number }) {
  * The media rectangle. There is no picture to show, so it carries the direction that will be
  * handed to whatever produces one, plus any text meant to be burned into the frame.
  */
-function Media({ onScreen, children }: { onScreen?: string[]; children?: ReactNode }) {
+/**
+ * The media rectangle. It used to be a placeholder; it now holds the frame that composition
+ * actually produced, at the delivery proportions it will be exported at.
+ */
+function Media({ frame, identity, children }: { frame?: FrameSpec; identity: BrandIdentity; children?: ReactNode }) {
+  if (frame) {
+    return (
+      <div className="mock-media is-composed">
+        <FrameCanvas spec={frame} identity={identity} />
+        {frame.truncated && <span className="mock-media-warn">El texto no entra completo en el frame</span>}
+      </div>
+    );
+  }
   return (
     <div className="mock-media">
       {children}
-      {onScreen && onScreen.length > 0 && (
-        <div className="mock-onscreen">{onScreen.map((line, index) => <span key={index}>{line}</span>)}</div>
-      )}
-      <span className="mock-media-note" aria-hidden="true">Acá va la imagen</span>
+      <span className="mock-media-note" aria-hidden="true">Sin frame compuesto</span>
     </div>
   );
 }
@@ -86,20 +98,30 @@ function PlatformTag({ variant }: { variant: PlatformContentVariant }) {
 }
 
 /** Vertical video: TikTok, Reels, Shorts. Same chrome, different rail and labels per platform. */
-function VerticalVideo({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+function VerticalVideo({ variant, account, frames, identity }: Renderable) {
   const script = variant.detail.shape === "video" ? variant.detail.script : null;
   const [scene, setScene] = useState(0);
   if (!script) return null;
   const current = script.scenes[Math.min(scene, script.scenes.length - 1)];
   const isYouTube = variant.platform === "youtube_shorts";
+  // Scene 0 is the cover; later scenes only have a composed card when they carry burnt-in text.
+  const composed = frames.find((item) => item.key === (scene === 0 ? "cover" : `scene-${scene}`));
 
   return (
     <div className="mock-vertical">
       <div className="mock-phone">
-        <div className="mock-frame">
-          {/* The opening frame is the hook: it is what decides whether anything else is read. */}
-          <p className="mock-hook">{scene === 0 ? script.hook : current.onScreenText ?? ""}</p>
-          <p className="mock-scene-visual">{current.visual}</p>
+        <div className={`mock-frame${composed ? " has-art" : ""}`}>
+          {/* The opening frame is the hook: it is what decides whether anything else is read.
+              Where composition produced a frame, that frame is the picture; the platform chrome
+              sits on top of it exactly as it will in the feed. */}
+          {composed ? (
+            <div className="mock-frame-art"><FrameCanvas spec={composed} identity={identity} /></div>
+          ) : (
+            <>
+              <p className="mock-hook">{scene === 0 ? script.hook : current.onScreenText ?? ""}</p>
+              <p className="mock-scene-visual">{current.visual}</p>
+            </>
+          )}
           {current.voiceover && <p className="mock-voiceover"><Volume2 size={11} /> {current.voiceover}</p>}
 
           <div className="mock-rail" aria-hidden="true">
@@ -140,11 +162,12 @@ function VerticalVideo({ variant, account }: { variant: PlatformContentVariant; 
 }
 
 /** Stories: the same vertical frame, but a timed sequence with segment bars on top. */
-function StorySequence({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+function StorySequence({ variant, account, frames, identity }: Renderable) {
   const story = variant.detail.shape === "story" ? variant.detail.story : null;
   const [index, setIndex] = useState(0);
   if (!story) return null;
   const frame = story.frames[Math.min(index, story.frames.length - 1)];
+  const composed = frames[Math.min(index, story.frames.length - 1)];
 
   return (
     <div className="mock-vertical">
@@ -153,9 +176,9 @@ function StorySequence({ variant, account }: { variant: PlatformContentVariant; 
           <div className="mock-segments" aria-hidden="true">
             {story.frames.map((_, position) => <span key={position} className={position <= index ? "is-seen" : ""} />)}
           </div>
+          {composed && <div className="mock-frame-art"><FrameCanvas spec={composed} identity={identity} /></div>}
           <p className="mock-handle mock-story-handle"><Avatar account={account} /> {account.handle}</p>
-          <p className="mock-hook">{frame.text}</p>
-          <p className="mock-scene-visual">{frame.visualNote}</p>
+          {!composed && <p className="mock-hook">{frame.text}</p>}
           <p className="mock-story-role">{frame.role} · {frame.durationSeconds}s</p>
         </div>
         <div className="mock-story-nav">
@@ -184,7 +207,7 @@ function StorySequence({ variant, account }: { variant: PlatformContentVariant; 
 }
 
 /** Carousel: Instagram slides, or a LinkedIn document, which is the same gesture. */
-function Carousel({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+function Carousel({ variant, account, frames, identity }: Renderable) {
   const carousel = variant.detail.shape === "carousel" ? variant.detail.carousel : null;
   const [slide, setSlide] = useState(0);
   if (!carousel) return null;
@@ -202,11 +225,10 @@ function Carousel({ variant, account }: { variant: PlatformContentVariant; accou
         <div><strong>{account.handle}</strong><small>{account.name}</small></div>
         <MoreHorizontal size={16} aria-hidden="true" />
       </header>
-      <Media>
+      <Media frame={frames[Math.min(slide, frames.length - 1)]} identity={identity}>
         <span className="mock-slide-kind">{current.kind}</span>
         <h4 className="mock-slide-headline">{current.headline}</h4>
         {current.body && <p className="mock-slide-body">{current.body}</p>}
-        <span className="mock-slide-count" aria-hidden="true">{slide + 1}/{slides.length}</span>
       </Media>
       <div className="mock-dots" role="tablist" aria-label="Láminas">
         {slides.map((item, index) => (
@@ -221,7 +243,7 @@ function Carousel({ variant, account }: { variant: PlatformContentVariant; accou
 }
 
 /** A single image post: Instagram or Facebook. */
-function StaticPost({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+function StaticPost({ variant, account, frames, identity }: Renderable) {
   const post = variant.detail.shape === "static" ? variant.detail.post : null;
   if (!post) return null;
   return (
@@ -231,7 +253,7 @@ function StaticPost({ variant, account }: { variant: PlatformContentVariant; acc
         <div><strong>{account.handle}</strong><small>{account.name}</small></div>
         <MoreHorizontal size={16} aria-hidden="true" />
       </header>
-      <Media onScreen={post.onScreenText}>
+      <Media frame={frames[0]} identity={identity}>
         <h4 className="mock-slide-headline">{post.headline}</h4>
       </Media>
       <div className="mock-actions" aria-hidden="true"><Heart size={19} /><MessageCircle size={19} /><Send size={19} /><Bookmark size={19} className="mock-actions-end" /></div>
@@ -265,15 +287,27 @@ function TextPost({ variant, account }: { variant: PlatformContentVariant; accou
   );
 }
 
-export function PlatformMockup({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+/**
+ * Frames arrive already composed. Composition is domain code that lives on the server; this
+ * component draws what it is handed, so `src/server` never has to ship to the browser.
+ */
+interface Renderable {
+  variant: PlatformContentVariant;
+  account: MockAccount;
+  frames: FrameSpec[];
+  identity: BrandIdentity;
+}
+
+export function PlatformMockup({ variant, account, frames, identity }: Renderable) {
   const shape = variant.detail.shape;
+  const props = { variant, account, frames, identity };
   return (
     <div className={`platform-mockup on-${variant.platform} shape-${shape}`}>
       <PlatformTag variant={variant} />
-      {shape === "video" && <VerticalVideo variant={variant} account={account} />}
-      {shape === "story" && <StorySequence variant={variant} account={account} />}
-      {shape === "carousel" && <Carousel variant={variant} account={account} />}
-      {shape === "static" && <StaticPost variant={variant} account={account} />}
+      {shape === "video" && <VerticalVideo {...props} />}
+      {shape === "story" && <StorySequence {...props} />}
+      {shape === "carousel" && <Carousel {...props} />}
+      {shape === "static" && <StaticPost {...props} />}
       {shape === "text" && <TextPost variant={variant} account={account} />}
       <p className="mock-disclaimer">
         Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance porque
