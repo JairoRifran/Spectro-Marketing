@@ -218,8 +218,8 @@
 .mock-direction{margin:0;padding:9px 13px 12px;color:#66736f;font-size:9px;line-height:1.5;background:#fafbfb;border-top:1px dashed #dbe3e0}
 .mock-direction b{display:block;margin-bottom:2px;color:#8b9592;font-size:8px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}
 .mock-dots{display:flex;justify-content:center;gap:5px;padding:9px 0 2px}
-.mock-dots button{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:#cfd8d5}
-.mock-dots button.is-active{background:var(--net)}
+.mock-dots button,.mock-dots>span{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:#cfd8d5;display:inline-block}
+.mock-dots button.is-active,.mock-dots>span.is-active{background:var(--net)}
 .mock-actions{display:flex;align-items:center;gap:15px;padding:10px 13px 4px;color:var(--net)}
 .mock-actions-end{margin-left:auto}
 .mock-actions.is-labelled{gap:0;justify-content:space-between;padding:9px 8px;border-top:1px solid var(--line);color:#66736f}
@@ -389,3 +389,6 @@
 .image-slots li.is-done{background:#f6f9f8}
 .image-slot-label{font-size:10px;color:#3f4f4c}
 .image-actions .voiceover-quick{display:inline-flex;align-items:center;gap:5px}
+
+.gallery-state{margin-top:14px;padding-top:12px;border-top:1px solid #eef1f0;display:grid;gap:8px}
+.gallery-state .voiceover-compact{margin-top:0}

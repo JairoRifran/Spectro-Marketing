@@ -208,7 +208,7 @@ test("the platform simulation never shows an engagement number", async ({ page }
   const gallery = page.locator(".content-gallery");
   await expect(gallery).toBeVisible();
 
-  const mockups = gallery.locator(".platform-mockup");
+  const mockups = gallery.locator(".gallery-card");
   await expect(mockups.first()).toBeVisible();
 
   const text = await mockups.first().innerText();
@@ -224,10 +224,10 @@ test("each piece is simulated inside the chrome of its own platform", async ({ p
 
   // The demo set is one Instagram carousel and one TikTok vertical video: two different shapes,
   // so a single generic card would be the wrong answer for at least one of them.
-  await expect(gallery.locator(".platform-mockup.on-instagram")).toHaveCount(1);
-  await expect(gallery.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
-  await expect(gallery.locator(".platform-mockup.on-tiktok .mock-phone")).toBeVisible();
-  await expect(gallery.locator(".platform-mockup.on-instagram .mock-dots")).toBeVisible();
+  await expect(gallery.locator(".gallery-card.on-instagram")).toHaveCount(1);
+  await expect(gallery.locator(".gallery-card.on-tiktok")).toHaveCount(1);
+  await expect(gallery.locator(".gallery-card.on-tiktok .mock-frame")).toBeVisible();
+  await expect(gallery.locator(".gallery-card.on-instagram .mock-dots")).toBeVisible();
 });
 
 test("switching to the simulation keeps the filters you already applied", async ({ page }) => {
@@ -235,13 +235,13 @@ test("switching to the simulation keeps the filters you already applied", async 
   await page.getByRole("link", { name: "Cómo se va a ver" }).click();
   await expect(page).toHaveURL(/platform=tiktok/);
   await expect(page).toHaveURL(/view=feed/);
-  await expect(page.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
-  await expect(page.locator(".platform-mockup.on-instagram")).toHaveCount(0);
+  await expect(page.locator(".gallery-card.on-tiktok")).toHaveCount(1);
+  await expect(page.locator(".gallery-card.on-instagram")).toHaveCount(0);
 });
 
 test("a caption is shown truncated the way a feed would truncate it", async ({ page }) => {
   await page.goto("/content?view=feed&platform=instagram");
-  const caption = page.locator(".platform-mockup.on-instagram .mock-caption");
+  const caption = page.locator(".gallery-card.on-instagram .mock-caption");
   await expect(caption.getByRole("button", { name: "más" })).toBeVisible();
   await caption.getByRole("button", { name: "más" }).click();
   await expect(caption.getByRole("button", { name: "ver menos" })).toBeVisible();
@@ -276,7 +276,7 @@ test("applying a filter does not throw you out of the simulation", async ({ page
   await page.locator("select[name='platform']").selectOption("tiktok");
   await page.getByRole("button", { name: "Aplicar" }).click();
   await expect(page).toHaveURL(/view=feed/);
-  await expect(page.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
+  await expect(page.locator(".gallery-card.on-tiktok")).toHaveCount(1);
   await expect(page.locator("table")).toHaveCount(0);
 });
 
@@ -285,17 +285,17 @@ test("applying a filter does not throw you out of the simulation", async ({ page
 test("every simulation names the platform it is headed for", async ({ page }) => {
   await page.goto("/content?view=feed");
 
-  const instagram = page.locator(".platform-mockup.on-instagram");
+  const instagram = page.locator(".gallery-card.on-instagram");
   await expect(instagram.locator(".mock-tag")).toContainText("Instagram");
   await expect(instagram.locator(".mock-tag")).toContainText("Carrusel");
 
-  const tiktok = page.locator(".platform-mockup.on-tiktok");
+  const tiktok = page.locator(".gallery-card.on-tiktok");
   await expect(tiktok.locator(".mock-tag")).toContainText("TikTok");
   await expect(tiktok.locator(".mock-tag")).toContainText("Video corto");
 
   // The accent is a real difference, not the same colour twice.
   const colourOf = (selector: string) => page.locator(selector).evaluate((node) => getComputedStyle(node).getPropertyValue("--net").trim());
-  expect(await colourOf(".platform-mockup.on-instagram")).not.toBe(await colourOf(".platform-mockup.on-tiktok"));
+  expect(await colourOf(".gallery-card.on-instagram")).not.toBe(await colourOf(".gallery-card.on-tiktok"));
 });
 
 test("the platform is named on the detail page simulation too", async ({ page }) => {
@@ -450,18 +450,39 @@ test("playing advances the sequence and the play control becomes pause", async (
   await expect(assembled).not.toContainText("0.0s /");
 });
 
-test("a playable piece opens ready to play, not behind a disclosure", async ({ page }) => {
+test("a playable piece opens ready to play, and is shown once", async ({ page }) => {
   await page.goto("/content?view=feed");
-  // Hidden behind a summary, the pieces that move looked exactly like the ones that do not.
-  const assembled = page.locator(".gallery-assembled .assembled").first();
-  await expect(assembled).toBeVisible();
-  await expect(assembled.getByRole("button", { name: "Reproducir" })).toBeVisible();
-  await expect(page.locator(".gallery-assembled summary")).toHaveCount(0);
+  const card = page.locator(".gallery-card").first();
+  await expect(card.locator(".assembled")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Reproducir" })).toBeVisible();
+  // One view per card: the simulation and the playback drew the same frame twice, which made
+  // every card twice as tall and said nothing the other had not.
+  await expect(card.locator(".platform-mockup")).toHaveCount(0);
+  await expect(card.locator(".assembled")).toHaveCount(1);
+});
+
+test("a card says what is generated and offers the rest from the list", async ({ page }) => {
+  await page.goto("/content?view=feed&platform=tiktok");
+  const state = page.locator(".gallery-state").first();
+  await expect(state).toContainText(/con imagen|ilustrada/);
+  await expect(state).toContainText("Sin voz en off");
+  await expect(state).toContainText("Sin música");
+  // Artwork, voice and music are each one click from the list rather than one page away.
+  expect(await state.getByRole("button").count()).toBeGreaterThanOrEqual(3);
+});
+
+test("a piece that is read in silence is not offered audio in the list either", async ({ page }) => {
+  // A carousel has no narration and no soundtrack; offering them would be selling what nobody
+  // asked for, in a second place.
+  await page.goto("/content?view=feed&platform=instagram");
+  const state = page.locator(".gallery-state").first();
+  await expect(state).toContainText(/con imagen/);
+  await expect(state).not.toContainText("Sin voz en off");
 });
 
 test("a piece missing audio says which, and offers each with its cost", async ({ page }) => {
   await page.goto("/content?view=feed&platform=tiktok");
-  const state = page.locator(".voiceover-compact").first();
+  const state = page.locator(".gallery-state .voiceover-compact").last();
   await expect(state).toContainText("Sin voz en off");
   await expect(state).toContainText("Sin música");
   // The price is on every button: nothing here spends without saying what it spends.

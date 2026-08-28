@@ -261,6 +261,8 @@ export type GalleryItem = ContentListItem & {
   /** Short-lived links to whatever audio the piece already has. */
   audioUrl: string | null;
   musicUrl: string | null;
+  /** Short-lived links to its artwork, keyed by the slot the composition refers to. */
+  images: Record<string, string>;
 };
 
 /**
@@ -275,21 +277,21 @@ export async function getContentGallery(filters: ContentFilters): Promise<Omit<A
   if (list.items.length === 0) return { ...list, items: [] };
 
   if (list.mode === "demo") {
-    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null, audioUrl: null, musicUrl: null })) };
+    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null, audioUrl: null, musicUrl: null, images: {} })) };
   }
 
   const ctx = await getOrganizationContext();
-  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null, audioUrl: null, musicUrl: null })) };
+  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null, audioUrl: null, musicUrl: null, images: {} })) };
 
   const ids = list.items.map((item) => item.id);
   const [{ data }, assets] = await Promise.all([
     ctx.db.from("content_variants").select("content_item_id,version,payload").eq("organization_id", ctx.orgId).in("content_item_id", ids),
-    ctx.db.from("content_assets").select("content_item_id,content_version,storage_path,slot").eq("organization_id", ctx.orgId).in("slot", ["voiceover", "music"]).in("content_item_id", ids),
+    ctx.db.from("content_assets").select("content_item_id,content_version,storage_path,slot,kind").eq("organization_id", ctx.orgId).in("content_item_id", ids),
   ]);
 
   // One signing call for the whole page. Signing per card would be a storage round trip per
   // piece, which is what kept the sequence collapsed and silent until now.
-  const assetRows = (assets.data ?? []) as Array<{ content_item_id: string; content_version: number; storage_path: string; slot: string }>;
+  const assetRows = (assets.data ?? []) as Array<{ content_item_id: string; content_version: number; storage_path: string; slot: string; kind: string }>;
   const signedByPath = new Map<string, string>();
   if (assetRows.length > 0) {
     const signed = await ctx.db.storage.from("content-assets").createSignedUrls(assetRows.map((row) => row.storage_path), 3600);
@@ -308,11 +310,20 @@ export async function getContentGallery(filters: ContentFilters): Promise<Omit<A
       const row = assetRows.find((entry) => entry.content_item_id === item.id && entry.content_version === item.currentVersion && entry.slot === slot);
       return row ? signedByPath.get(row.storage_path) ?? null : null;
     };
+    // Every picture the piece has, keyed by its slot, so a frame can find its own.
+    const images: Record<string, string> = {};
+    for (const row of assetRows) {
+      if (row.content_item_id !== item.id || row.content_version !== item.currentVersion || row.kind !== "image") continue;
+      const url = signedByPath.get(row.storage_path);
+      if (url) images[row.slot] = url;
+    }
+
     return {
       ...item,
       variant: (chosen?.payload as PlatformContentVariant | undefined) ?? null,
       audioUrl: assetFor("voiceover"),
       musicUrl: assetFor("music"),
+      images,
     };
   });
 

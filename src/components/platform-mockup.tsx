@@ -7,7 +7,7 @@ import type { MockAccount } from "@/features/content/account";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
 import { FrameCanvas } from "./frame-canvas";
 import { FrameExport } from "./frame-export";
-import { VerticalChrome } from "./platform-chrome";
+import { Caption, VerticalChrome } from "./platform-chrome";
 import type { BrandIdentity } from "@/server/media/identity";
 
 // What the piece will look like where it lands.
@@ -32,27 +32,6 @@ function initials(name: string) {
 
 function Avatar({ account }: { account: MockAccount }) {
   return <span className="mock-avatar" aria-hidden="true">{initials(account.name)}</span>;
-}
-
-/** A feed truncates. Seeing where the cut falls is half the point of previewing a caption. */
-function Caption({ text, limit }: { text: string; limit: number }) {
-  const [open, setOpen] = useState(false);
-  const flat = text.trim();
-  const needsCut = flat.length > limit;
-  if (!needsCut || open) {
-    return (
-      <p className="mock-caption">
-        {flat}
-        {needsCut && <button type="button" onClick={() => setOpen(false)}>ver menos</button>}
-      </p>
-    );
-  }
-  return (
-    <p className="mock-caption">
-      {flat.slice(0, limit).trimEnd()}…
-      <button type="button" onClick={() => setOpen(true)}>más</button>
-    </p>
-  );
 }
 
 /**
@@ -89,7 +68,7 @@ function Direction({ text }: { text: string }) {
  * Says which platform this is, in its own colour. Without it three cards side by side read as
  * three copies of the same thing, which is exactly the opposite of the point.
  */
-function PlatformTag({ variant }: { variant: PlatformContentVariant }) {
+export function PlatformTag({ variant }: { variant: PlatformContentVariant }) {
   return (
     <p className="mock-tag">
       <span className="mock-tag-dot" aria-hidden="true" />

@@ -3,7 +3,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { FilterBar, StatusPill, WorkspacePage } from "@/components/workspace-page";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/components/content-preview";
 import { CONTENT_PAGE_SIZE, getContentGallery, type ContentFilters } from "@/features/content/data";
-import { PlatformMockup } from "@/components/platform-mockup";
+import { PlatformMockup, PlatformTag } from "@/components/platform-mockup";
 import { accountFor } from "@/features/content/account";
 import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
@@ -12,6 +12,8 @@ import { intendedTimings } from "@/server/media/timing";
 import { buildNarration } from "@/server/media/narration";
 import { buildMusicBrief } from "@/server/media/soundtrack";
 import { SoundActions } from "@/components/sound-actions";
+import { ImageActions } from "@/components/image-actions";
+import { FrameExport } from "@/components/frame-export";
 import { estimateCost, ratesFromEnv } from "@/server/spend/pricing";
 import { formatMoney } from "@/server/spend/money";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
@@ -120,56 +122,96 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       const variant = item.variant;
                       const frames = composeFrames(variant);
                       const narration = buildNarration(variant);
-                      // Priced with the brand's own tone where there is one; the label only decides
-                      // the character, not the length, so the estimate holds either way.
                       const musicBrief = buildMusicBrief(variant, "cercana", item.pillar);
                       const playable = frames.length > 1;
+                      const tracks = [
+                        item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg", name: "voz-en-off" } : null,
+                        item.musicUrl ? { url: item.musicUrl, mimeType: "audio/mpeg", name: "musica" } : null,
+                      ].filter(Boolean) as Array<{ url: string; mimeType: string; name: string }>;
+
                       return (
                         <>
-                          {/* Anything with a sequence opens ready to play. Hiding it behind a
-                              disclosure meant the pieces that move looked exactly like the ones
-                              that do not. */}
-                          {playable && (
-                            <div className="gallery-assembled">
-                              <AssembledPreview
-                                frames={frames}
-                                timings={intendedTimings(variant, frames)}
-                                identity={SPECTRO_IDENTITY}
-                                voiceUrl={item.audioUrl}
-                                musicUrl={item.musicUrl}
-                                label={item.title}
-                                chrome={variant.detail.shape === "video" || variant.detail.shape === "story"
-                      ? { kind: "vertical" as const, platform: variant.platform, account: account, caption: variant.caption }
-                      : { kind: "post" as const, platform: variant.platform, account: account, caption: variant.caption }}
-                              />
-                              <SoundActions
-                                contentItemId={item.id}
-                                demo={data.mode === "demo"}
-                                compact
-                                preflight={{
-                                  voice: narration
-                                    ? {
-                                        possible: true,
-                                        estimate: formatMoney(estimateCost({ operation: "media.tts", text: narration.text }, rates)),
-                                        existing: item.audioUrl ? { durationSeconds: null, generatedBy: "provider", url: item.audioUrl } : null,
-                                      }
-                                    : { possible: false, estimate: null, existing: null },
-                                  music: musicBrief
-                                    ? {
-                                        possible: true,
-                                        estimate: formatMoney(estimateCost({ operation: "media.music", seconds: musicBrief.seconds }, rates)),
-                                        existing: item.musicUrl ? { durationSeconds: null, generatedBy: "provider", url: item.musicUrl } : null,
-                                      }
-                                    : { possible: false, estimate: null, existing: null },
-                                  needsProfile: false,
-                                }}
-                              />
-                            </div>
+                          <PlatformTag variant={variant} />
+
+                          {/* One view per card. The simulation and the assembled playback drew
+                              the same frame twice, which made every card twice as tall as it
+                              needed to be and said nothing the other had not. */}
+                          {playable ? (
+                            <AssembledPreview
+                              frames={frames}
+                              timings={intendedTimings(variant, frames)}
+                              identity={SPECTRO_IDENTITY}
+                              images={item.images}
+                              voiceUrl={item.audioUrl}
+                              musicUrl={item.musicUrl}
+                              label={item.title}
+                              chrome={variant.detail.shape === "video" || variant.detail.shape === "story"
+                                ? { kind: "vertical" as const, platform: variant.platform, account, caption: variant.caption }
+                                : { kind: "post" as const, platform: variant.platform, account, caption: variant.caption }}
+                            />
+                          ) : (
+                            <PlatformMockup
+                              variant={variant}
+                              account={account}
+                              frames={frames}
+                              identity={SPECTRO_IDENTITY}
+                              images={item.images}
+                              title={item.title}
+                              audio={tracks}
+                            />
                           )}
-                          <PlatformMockup variant={variant} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={[
-                            item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg", name: "voz-en-off" } : null,
-                            item.musicUrl ? { url: item.musicUrl, mimeType: "audio/mpeg", name: "musica" } : null,
-                          ].filter(Boolean) as Array<{ url: string; mimeType: string; name: string }>} />
+
+                          {/* The honesty note travels with the card, not with one of the two
+                              views it used to live in. Losing it when the views merged would
+                              have quietly removed the only thing on screen saying these are
+                              simulations. */}
+                          <p className="mock-disclaimer">
+                            Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance
+                            porque nada se publicó todavía; cualquier número acá sería inventado.
+                          </p>
+
+                          {/* What exists and what does not, in one place and actionable. */}
+                          <div className="gallery-state">
+                            <ImageActions
+                              contentItemId={item.id}
+                              demo={data.mode === "demo"}
+                              compact
+                              frames={frames.map((frame) => ({ key: frame.key, label: frame.label }))}
+                              existing={Object.keys(item.images)}
+                            />
+                            <SoundActions
+                              contentItemId={item.id}
+                              demo={data.mode === "demo"}
+                              compact
+                              preflight={{
+                                voice: narration
+                                  ? {
+                                      possible: true,
+                                      estimate: formatMoney(estimateCost({ operation: "media.tts", text: narration.text }, rates)),
+                                      existing: item.audioUrl ? { durationSeconds: null, generatedBy: "provider", url: item.audioUrl } : null,
+                                    }
+                                  : { possible: false, estimate: null, existing: null },
+                                music: musicBrief
+                                  ? {
+                                      possible: true,
+                                      estimate: formatMoney(estimateCost({ operation: "media.music", seconds: musicBrief.seconds }, rates)),
+                                      existing: item.musicUrl ? { durationSeconds: null, generatedBy: "provider", url: item.musicUrl } : null,
+                                    }
+                                  : { possible: false, estimate: null, existing: null },
+                                needsProfile: false,
+                              }}
+                            />
+                            {playable && (
+                              <FrameExport
+                                variant={variant}
+                                frames={frames}
+                                identity={SPECTRO_IDENTITY}
+                                images={item.images}
+                                title={item.title}
+                                audio={tracks}
+                              />
+                            )}
+                          </div>
                         </>
                       );
                     })() : <p className="panel-empty">Planificada, todavía sin escribir.</p>}

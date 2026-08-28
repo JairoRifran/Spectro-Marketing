@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Music2, Repeat2, Send } from "lucide-react";
 import type { MockAccount } from "@/features/content/account";
 
@@ -16,6 +16,28 @@ import type { MockAccount } from "@/features/content/account";
 function initials(name: string) {
   return name.replace(/[^\p{L}\p{N} ]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "SP";
 }
+
+/** A feed truncates. Seeing where the cut falls is half the point of previewing a caption. */
+export function Caption({ text, limit }: { text: string; limit: number }) {
+  const [open, setOpen] = useState(false);
+  const flat = text.trim();
+  const needsCut = flat.length > limit;
+  if (!needsCut || open) {
+    return (
+      <p className="mock-caption">
+        {flat}
+        {needsCut && <button type="button" onClick={() => setOpen(false)}>ver menos</button>}
+      </p>
+    );
+  }
+  return (
+    <p className="mock-caption">
+      {flat.slice(0, limit).trimEnd()}…
+      <button type="button" onClick={() => setOpen(true)}>más</button>
+    </p>
+  );
+}
+
 
 /** A full-screen vertical video: TikTok, Reels, Shorts, Stories. */
 export function VerticalChrome({ account, caption, platform, children, footer }: {

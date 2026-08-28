@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { FrameCanvas } from "./frame-canvas";
-import { PostChrome, VerticalChrome } from "./platform-chrome";
+import { Caption, PostChrome, VerticalChrome } from "./platform-chrome";
 import type { MockAccount } from "@/features/content/account";
 import { fitToDuration, frameAt, type FrameTiming } from "@/server/media/timing";
 import type { BrandIdentity } from "@/server/media/identity";
@@ -118,7 +118,19 @@ export function AssembledPreview({ frames, timings, identity, images = {}, voice
             <FrameCanvas spec={frames[index]} identity={identity} images={images} />
           </VerticalChrome>
         ) : chrome?.kind === "post" ? (
-          <PostChrome account={chrome.account}>
+          <PostChrome
+            account={chrome.account}
+            // Kept from the static simulation: where the caption is cut and how many slides
+            // there are is information about how the piece reads, not decoration.
+            dots={frames.length > 1 ? (
+              <div className="mock-dots" aria-hidden="true">
+                {frames.map((frame, position) => (
+                  <span key={frame.key} className={position === index ? "is-active" : ""} />
+                ))}
+              </div>
+            ) : undefined}
+            caption={<Caption text={`${chrome.account.handle} ${chrome.caption}`} limit={125} />}
+          >
             <div className="mock-media is-composed">
               <FrameCanvas spec={frames[index]} identity={identity} images={images} />
             </div>

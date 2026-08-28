@@ -19,13 +19,15 @@ const PROBLEM: Record<string, string> = {
   spend_refused: "El tope de gasto no permite esta imagen.",
 };
 
-export function ImageActions({ contentItemId, demo, frames, existing }: {
+export function ImageActions({ contentItemId, demo, frames, existing, compact = false }: {
   contentItemId: string;
   demo: boolean;
   /** Every frame the composition produces, in order. */
   frames: Array<{ key: string; label: string }>;
   /** The slots that already have a picture. */
   existing: string[];
+  /** The gallery form: the count, and the next one missing. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -51,7 +53,31 @@ export function ImageActions({ contentItemId, demo, frames, existing }: {
     router.refresh();
   }
 
-  if (frames.length === 0) return <p className="voiceover-none">Esta pieza no tiene láminas para ilustrar.</p>;
+  if (frames.length === 0) {
+    return compact ? null : <p className="voiceover-none">Esta pieza no tiene láminas para ilustrar.</p>;
+  }
+
+  if (compact) {
+    // One at a time is the service's constraint, so the control offers the next missing frame
+    // rather than a button that would be killed halfway through the set.
+    const missing = frames.filter((frame) => !has.has(frame.key));
+    const done = frames.length - missing.length;
+    return (
+      <div className="voiceover-compact">
+        {missing.length === 0 ? (
+          <span className="voiceover-has"><Check size={13} /> {frames.length} {frames.length === 1 ? "lámina ilustrada" : "láminas ilustradas"}</span>
+        ) : (
+          <span className="sound-pending">
+            <span className="voiceover-missing"><CircleAlert size={13} /> {done}/{frames.length} con imagen</span>
+            <button className="voiceover-quick" onClick={() => generate(missing[0].key)} disabled={busy !== null}>
+              {busy ? <><Loader2 size={12} className="spin" /> Generando…</> : <><ImageIcon size={12} /> Ilustrar {missing[0].label}</>}
+            </button>
+          </span>
+        )}
+        {message && <small className="form-error">{message}</small>}
+      </div>
+    );
+  }
 
   return (
     <div className="image-actions">
