@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fitToDuration, frameAt, intendedTimings, startTimes } from "@/server/media/timing";
 import { composeFrames } from "@/server/media/compose";
@@ -103,5 +104,38 @@ describe("which frame is showing", () => {
 
   it("has nothing to show for an empty sequence", () => {
     expect(frameAt([], 1)).toBe(-1);
+  });
+});
+
+// Both tracks have to reach the assembly, and the music has to sit under the voice rather than
+// merely be present: music at full volume under narration is the commonest way an otherwise
+// finished piece is unusable.
+describe("the assembled mix", () => {
+  const source = readFileSync(new URL("../../../src/components/assembled-preview.tsx", import.meta.url), "utf8");
+
+  it("plays the voice and the music, not just one of them", () => {
+    expect(source).toContain("voiceRef");
+    expect(source).toContain("musicRef");
+    expect(source.match(/<audio/g)?.length).toBe(2);
+  });
+
+  it("ducks the music under the voice", () => {
+    expect(source).toContain("MUSIC_UNDER_VOICE");
+    const under = Number(source.match(/MUSIC_UNDER_VOICE = ([\d.]+)/)?.[1]);
+    const alone = Number(source.match(/MUSIC_ALONE = ([\d.]+)/)?.[1]);
+    expect(under).toBeGreaterThan(0);
+    expect(under).toBeLessThan(alone);
+  });
+
+  it("starts and stops both together", () => {
+    // A track that starts late is a track out of sync for the whole piece.
+    expect(source).toContain("function eachTrack");
+    expect(source).toContain("eachTrack((audio) => audio.pause())");
+    expect(source).toContain("eachTrack((audio) => { audio.currentTime = 0; })");
+  });
+
+  it("takes its clock from the voice when there is one", () => {
+    // The pacing was fitted to the narration, so the narration is what it follows.
+    expect(source).toContain("const clockRef = voiceUrl ? voiceRef : musicUrl ? musicRef : null");
   });
 });

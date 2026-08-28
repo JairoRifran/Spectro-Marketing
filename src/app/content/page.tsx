@@ -135,7 +135,8 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                                 frames={frames}
                                 timings={intendedTimings(variant, frames)}
                                 identity={SPECTRO_IDENTITY}
-                                audioUrl={item.audioUrl}
+                                voiceUrl={item.audioUrl}
+                                musicUrl={item.musicUrl}
                                 label={item.title}
                               />
                               <SoundActions
@@ -162,7 +163,10 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                               />
                             </div>
                           )}
-                          <PlatformMockup variant={variant} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg" } : null} />
+                          <PlatformMockup variant={variant} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={[
+                            item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg", name: "voz-en-off" } : null,
+                            item.musicUrl ? { url: item.musicUrl, mimeType: "audio/mpeg", name: "musica" } : null,
+                          ].filter(Boolean) as Array<{ url: string; mimeType: string; name: string }>} />
                         </>
                       );
                     })() : <p className="panel-empty">Planificada, todavía sin escribir.</p>}

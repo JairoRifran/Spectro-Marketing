@@ -6,25 +6,32 @@ import { fitToDuration, frameAt, type FrameTiming } from "@/server/media/timing"
 import type { BrandIdentity } from "@/server/media/identity";
 import type { FrameSpec } from "@/server/media/spec";
 
-// The piece, assembled: its frames in sequence with its voice over them.
+// The piece, assembled: its frames in sequence with its voice and its music over them.
 //
-// Not a rendered video and it does not pretend to be one. It is the two things that exist —
-// composed frames and synthesised audio — played together, which is enough to answer the
-// question a rendered file would answer: does this hold for its whole length, and does the
-// voice land on the beat it was written for.
+// Not a rendered video and it does not pretend to be one. It is the things that actually exist —
+// composed frames, a synthesised voice, a composed track — played together, which answers the
+// question a rendered file would: does this hold for its whole length, does the voice land on the
+// beat it was written for, and does the music sit under it or fight it.
 //
-// When the audio has loaded, its real length sets the total and the script's pacing sets the
-// proportions. Before that, and when there is no audio at all, the script's own seconds are used
-// unchanged rather than guessed at.
+// The two tracks are mixed rather than merely both present. Music at full volume under a
+// voiceover makes the narration unintelligible, which is the single most common way an otherwise
+// finished piece is unusable — so it is ducked, and only plays at its own level when there is no
+// voice to sit under.
 
-export function AssembledPreview({ frames, timings, identity, audioUrl, label }: {
+/** Where the music sits when a voice is speaking over it, and when it plays alone. */
+const MUSIC_UNDER_VOICE = 0.22;
+const MUSIC_ALONE = 0.7;
+
+export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl, label }: {
   frames: FrameSpec[];
   timings: FrameTiming[];
   identity: BrandIdentity;
-  audioUrl?: string | null;
+  voiceUrl?: string | null;
+  musicUrl?: string | null;
   label: string;
 }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceRef = useRef<HTMLAudioElement | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -34,7 +41,13 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
   const total = fitted.reduce((sum, timing) => sum + timing.seconds, 0);
   const index = Math.max(0, frameAt(fitted, elapsed));
 
-  // Without audio there is no clock to follow, so the preview keeps its own.
+  // The voice is the clock when there is one: it is what the pacing was fitted to.
+  const clockRef = voiceUrl ? voiceRef : musicUrl ? musicRef : null;
+
+  useEffect(() => {
+    if (musicRef.current) musicRef.current.volume = voiceUrl ? MUSIC_UNDER_VOICE : MUSIC_ALONE;
+  }, [voiceUrl, musicUrl]);
+
   useEffect(() => {
     if (!playing) return;
     // The clock comes from the frame callback's own timestamp rather than from reading the
@@ -44,7 +57,8 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
       const delta = last === null ? 0 : (now - last) / 1000;
       last = now;
       setElapsed((current) => {
-        const next = audioRef.current && !audioRef.current.paused ? audioRef.current.currentTime : current + delta;
+        const clock = clockRef?.current;
+        const next = clock && !clock.paused ? clock.currentTime : current + delta;
         if (next >= total) {
           setPlaying(false);
           return total;
@@ -57,27 +71,34 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [playing, total]);
+  }, [playing, total, clockRef]);
+
+  function eachTrack(action: (audio: HTMLAudioElement) => void) {
+    for (const ref of [voiceRef, musicRef]) {
+      if (ref.current) action(ref.current);
+    }
+  }
 
   function toggle() {
-    const audio = audioRef.current;
     if (playing) {
-      audio?.pause();
+      eachTrack((audio) => audio.pause());
       setPlaying(false);
       return;
     }
     if (elapsed >= total) restart();
-    if (audio) void audio.play().catch(() => undefined);
+    // Both start together; a track that starts late is a track out of sync for the whole piece.
+    eachTrack((audio) => void audio.play().catch(() => undefined));
     setPlaying(true);
   }
 
   function restart() {
-    const audio = audioRef.current;
-    if (audio) audio.currentTime = 0;
+    eachTrack((audio) => { audio.currentTime = 0; });
     setElapsed(0);
   }
 
   if (frames.length === 0) return null;
+
+  const tracks = [voiceUrl ? "voz" : null, musicUrl ? "música" : null].filter(Boolean);
 
   return (
     <div className="assembled" aria-label={`Vista ensamblada de ${label}`}>
@@ -89,7 +110,7 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
         <button type="button" className="assembled-play" onClick={toggle} aria-label={playing ? "Pausar" : "Reproducir"}>
           {playing ? <Pause size={15} /> : <Play size={15} />}
         </button>
-        <button type="button" className="assembled-restart" onClick={() => { restart(); }} aria-label="Volver al principio">
+        <button type="button" className="assembled-restart" onClick={restart} aria-label="Volver al principio">
           <RotateCcw size={14} />
         </button>
 
@@ -112,13 +133,13 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
 
       <p className="assembled-caption">
         {frames[index].label}
-        {audioUrl ? "" : " · sin voz todavía"}
+        {tracks.length > 0 ? ` · con ${tracks.join(" y ")}` : " · sin audio todavía"}
       </p>
 
-      {audioUrl && (
+      {voiceUrl && (
         <audio
-          ref={audioRef}
-          src={audioUrl}
+          ref={voiceRef}
+          src={voiceUrl}
           preload="metadata"
           onLoadedMetadata={(event) => {
             const duration = event.currentTarget.duration;
@@ -127,6 +148,19 @@ export function AssembledPreview({ frames, timings, identity, audioUrl, label }:
             setAudioSeconds(Number.isFinite(duration) && duration > 0 ? duration : null);
           }}
           onEnded={() => setPlaying(false)}
+        />
+      )}
+
+      {musicUrl && (
+        <audio
+          ref={musicRef}
+          src={musicUrl}
+          preload="metadata"
+          onLoadedMetadata={(event) => {
+            if (voiceUrl) return;
+            const duration = event.currentTarget.duration;
+            setAudioSeconds(Number.isFinite(duration) && duration > 0 ? duration : null);
+          }}
         />
       )}
     </div>

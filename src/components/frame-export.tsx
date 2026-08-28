@@ -125,8 +125,8 @@ export function FrameExport({ variant, frames, identity, title, audio }: {
   frames: FrameSpec[];
   identity: BrandIdentity;
   title: string;
-  /** The produced voiceover, when there is one. Absent is normal, not a failure. */
-  audio?: { url: string; mimeType: string } | null;
+  /** Whatever audio the piece already has. Absent is normal, not a failure. */
+  audio?: Array<{ url: string; mimeType: string; name: string }> | null;
 }) {
   const [state, setState] = useState<"idle" | "working" | "error">("idle");
   // A pack that shipped without its audio is not a failure, but it is not silent either.
@@ -142,19 +142,20 @@ export function FrameExport({ variant, frames, identity, title, audio }: {
         entries.push({ name: `${variant.platform}-${String(index + 1).padStart(2, "0")}-${frame.label}.png`, bytes: png });
       }
 
-      // The audio belongs in the pack: a piece is not ready to post without the voice that
-      // goes with it. A failure to fetch it must not lose the images, so the pack still ships.
-      if (audio?.url) {
+      // The audio belongs in the pack: a piece is not ready to post without the sound that goes
+      // with it. A failure to fetch one track must not lose the rest, so the pack still ships
+      // and says what is missing.
+      for (const track of audio ?? []) {
         try {
-          const response = await fetch(audio.url);
+          const response = await fetch(track.url);
           if (response.ok) {
             const bytes = new Uint8Array(await response.arrayBuffer());
-            entries.push({ name: `${variant.platform}-voz-en-off.${audio.mimeType.includes("wav") ? "wav" : "mp3"}`, bytes });
+            entries.push({ name: `${variant.platform}-${track.name}.${track.mimeType.includes("wav") ? "wav" : "mp3"}`, bytes });
           } else {
-            setNote("Las imágenes y el texto están; no se pudo agregar el audio al paquete.");
+            setNote("Las imágenes y el texto están; no se pudo agregar todo el audio al paquete.");
           }
         } catch {
-          setNote("Las imágenes y el texto están; no se pudo agregar el audio al paquete.");
+          setNote("Las imágenes y el texto están; no se pudo agregar todo el audio al paquete.");
         }
       }
 
@@ -177,7 +178,7 @@ export function FrameExport({ variant, frames, identity, title, audio }: {
         <Download size={14} />
         {state === "working"
           ? "Armando el paquete…"
-          : `Descargar ${frames.length > 0 ? `${frames.length === 1 ? "la pieza" : `las ${frames.length} imágenes`}, ` : ""}${audio?.url ? "la voz y " : ""}el texto`}
+          : `Descargar ${frames.length > 0 ? `${frames.length === 1 ? "la pieza" : `las ${frames.length} imágenes`}, ` : ""}${(audio?.length ?? 0) > 0 ? `${audio!.length === 1 ? "el audio" : "los audios"} y ` : ""}el texto`}
       </button>
       {state === "error" && <small className="form-error">No se pudo armar el paquete en este navegador.</small>}
       {note && <small className="form-note">{note}</small>}

@@ -83,11 +83,15 @@ export default async function ContentDetailPage({ params, searchParams }: { para
                     frames={frames}
                     timings={intendedTimings(variant.payload, frames)}
                     identity={SPECTRO_IDENTITY}
-                    audioUrl={sound.voice.existing?.url ?? null}
+                    voiceUrl={sound.voice.existing?.url ?? null}
+                    musicUrl={sound.music.existing?.url ?? null}
                     label={item.title}
                   />
                 ) : undefined}
-                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={sound.voice.existing?.url ? { url: sound.voice.existing.url, mimeType: "audio/mpeg" } : null} />}
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={[
+                  sound.voice.existing?.url ? { url: sound.voice.existing.url, mimeType: "audio/mpeg", name: "voz-en-off" } : null,
+                  sound.music.existing?.url ? { url: sound.music.existing.url, mimeType: "audio/mpeg", name: "musica" } : null,
+                ].filter(Boolean) as Array<{ url: string; mimeType: string; name: string }>} />}
                 production={<ContentPreview variant={variant.payload} />}
               />
             ) : <p className="panel-empty">Todavía no hay una versión escrita.</p>}

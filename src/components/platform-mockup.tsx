@@ -299,7 +299,7 @@ interface Renderable {
   identity: BrandIdentity;
 }
 
-export function PlatformMockup({ variant, account, frames, identity, title, audio }: Renderable & { title?: string; audio?: { url: string; mimeType: string } | null }) {
+export function PlatformMockup({ variant, account, frames, identity, title, audio }: Renderable & { title?: string; audio?: Array<{ url: string; mimeType: string; name: string }> | null }) {
   const shape = variant.detail.shape;
   const props = { variant, account, frames, identity };
   return (
