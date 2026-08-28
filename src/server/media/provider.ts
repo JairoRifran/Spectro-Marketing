@@ -20,7 +20,10 @@ import { deliverySchema } from "./voice-profile";
 export const speechRequestSchema = z.object({
   /** The exact string that will be sent. This is what gets billed and what gets estimated. */
   text: z.string().trim().min(1).max(5_000),
-  /** Vendor-neutral identifier chosen by the operator. Never a vendor's internal default. */
+  /**
+   * The provider's own voice identifier, already resolved from the profile the brand asked for.
+   * Callers pick it with `selectVoice`; nothing downstream guesses one.
+   */
   voiceId: z.string().trim().min(1).max(200),
   /** BCP-47, so a provider can pick a pronunciation model without guessing from the text. */
   language: z.string().trim().min(2).max(12).default("es-UY"),

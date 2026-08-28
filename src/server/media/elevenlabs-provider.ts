@@ -23,7 +23,6 @@ const TIMEOUT_MS = 30_000;
 
 export interface ElevenLabsConfig {
   apiKey: string;
-  voiceId: string;
   /** Injectable so the adapter can be tested without a network. */
   fetchImpl?: typeof fetch;
 }
@@ -67,8 +66,8 @@ export class ElevenLabsProvider implements MediaProvider {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly config: ElevenLabsConfig) {
-    if (!config.apiKey || !config.voiceId) {
-      throw new MediaProviderError("invalid_request", "elevenlabs", "Falta configurar la clave o la voz.");
+    if (!config.apiKey) {
+      throw new MediaProviderError("invalid_request", "elevenlabs", "Falta configurar la clave del proveedor de voz.");
     }
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
@@ -85,7 +84,9 @@ export class ElevenLabsProvider implements MediaProvider {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(`${ENDPOINT}/${encodeURIComponent(this.config.voiceId)}`, {
+      // The voice comes from the request: it was resolved from the profile the brand asked
+      // for, and a voice fixed at construction could only ever be one region.
+      response = await this.fetchImpl(`${ENDPOINT}/${encodeURIComponent(parsed.data.voiceId)}`, {
         method: "POST",
         headers: {
           "xi-api-key": this.config.apiKey,

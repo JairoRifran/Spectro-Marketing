@@ -102,7 +102,7 @@ describe("choosing a voice for a profile", () => {
 describe("translating delivery for the vendor", () => {
   async function settingsSentFor(tone: Parameters<typeof deliveryFor>[0]) {
     const fetchImpl = vi.fn(async () => new Response(new Uint8Array([1]) as unknown as BodyInit, { status: 200 }));
-    const provider = new ElevenLabsProvider({ apiKey: "k", voiceId: "v", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const provider = new ElevenLabsProvider({ apiKey: "k", fetchImpl: fetchImpl as unknown as typeof fetch });
     await provider.synthesizeSpeech({ text: "hola", voiceId: "v", language: "es-UY", delivery: deliveryFor(tone) });
     return JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
   }
@@ -139,7 +139,7 @@ describe("translating delivery for the vendor", () => {
 
   it("sends no settings at all when no delivery was asked for", async () => {
     const fetchImpl = vi.fn(async () => new Response(new Uint8Array([1]) as unknown as BodyInit, { status: 200 }));
-    const provider = new ElevenLabsProvider({ apiKey: "k", voiceId: "v", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const provider = new ElevenLabsProvider({ apiKey: "k", fetchImpl: fetchImpl as unknown as typeof fetch });
     await provider.synthesizeSpeech({ text: "hola", voiceId: "v", language: "es-UY" });
     const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body.voice_settings).toBeUndefined();

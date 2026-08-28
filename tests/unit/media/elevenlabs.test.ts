@@ -5,7 +5,7 @@ import { MediaProviderError } from "@/server/media/provider";
 import { getMediaProvider, isRealMediaProviderConfigured } from "@/server/media/providers";
 
 const KEY = "clave-secreta-de-prueba";
-const request = { text: "Antes de automatizar, describí la tarea.", voiceId: "unused", language: "es-UY" };
+const request = { text: "Antes de automatizar, describí la tarea.", voiceId: "voz-1", language: "es-UY" };
 
 function providerWith(response: Response | Error) {
   const fetchImpl = vi.fn(async () => {
@@ -13,7 +13,7 @@ function providerWith(response: Response | Error) {
     return response;
   }) as unknown as typeof fetch;
   return {
-    provider: new ElevenLabsProvider({ apiKey: KEY, voiceId: "voz-1", fetchImpl }),
+    provider: new ElevenLabsProvider({ apiKey: KEY, fetchImpl }),
     fetchImpl: fetchImpl as unknown as ReturnType<typeof vi.fn>,
   };
 }
@@ -22,7 +22,7 @@ const audio = (bytes = new Uint8Array([1, 2, 3, 4]), init: ResponseInit = {}) =>
   new Response(bytes as unknown as BodyInit, { status: 200, headers: { "content-type": "audio/mpeg" }, ...init });
 
 describe("the request it sends", () => {
-  it("posts to the documented endpoint for the configured voice", async () => {
+  it("posts to the endpoint for the voice the request carries, not a fixed one", async () => {
     const { provider, fetchImpl } = providerWith(audio());
     await provider.synthesizeSpeech(request);
     const [url, init] = fetchImpl.mock.calls[0];
@@ -123,9 +123,8 @@ describe("the credential never leaks", () => {
     expect(error.message).not.toContain(request.text);
   });
 
-  it("refuses to construct without a key or a voice, instead of calling with an empty one", () => {
-    expect(() => new ElevenLabsProvider({ apiKey: "", voiceId: "v" })).toThrow(MediaProviderError);
-    expect(() => new ElevenLabsProvider({ apiKey: KEY, voiceId: "" })).toThrow(MediaProviderError);
+  it("refuses to construct without a key, instead of calling with an empty credential", () => {
+    expect(() => new ElevenLabsProvider({ apiKey: "" })).toThrow(MediaProviderError);
   });
 });
 
@@ -134,18 +133,14 @@ describe("choosing a provider", () => {
     expect(getMediaProvider({})).toBeInstanceOf(MockMediaProvider);
   });
 
-  it("still uses the mock when the voice was never chosen", () => {
-    // A vendor's default voice is a choice nobody made, and it would be the voice of the brand.
-    expect(getMediaProvider({ ELEVENLABS_API_KEY: KEY })).toBeInstanceOf(MockMediaProvider);
-    expect(isRealMediaProviderConfigured({ ELEVENLABS_API_KEY: KEY })).toBe(false);
+  it("is not fooled by whitespace standing in for a key", () => {
+    expect(isRealMediaProviderConfigured({ ELEVENLABS_API_KEY: "  " })).toBe(false);
+    expect(getMediaProvider({ ELEVENLABS_API_KEY: "  " })).toBeInstanceOf(MockMediaProvider);
   });
 
-  it("is not fooled by whitespace standing in for a value", () => {
-    expect(isRealMediaProviderConfigured({ ELEVENLABS_API_KEY: "  ", ELEVENLABS_VOICE_ID: "  " })).toBe(false);
-  });
-
-  it("uses the real provider once both are set", () => {
-    const provider = getMediaProvider({ ELEVENLABS_API_KEY: KEY, ELEVENLABS_VOICE_ID: "voz-1" });
+  it("uses the real provider once the key is set", () => {
+    // The voice is not part of this decision: it belongs to the brand and travels per request.
+    const provider = getMediaProvider({ ELEVENLABS_API_KEY: KEY });
     expect(provider).toBeInstanceOf(ElevenLabsProvider);
     expect(provider.name).toBe("elevenlabs");
   });
