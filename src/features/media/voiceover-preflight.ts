@@ -17,7 +17,15 @@ export interface VoiceoverPreflight {
   characters: number;
   /** What it would cost, in words, shown before anything is spent. */
   estimate: string | null;
-  existing: { durationSeconds: number | null; generatedBy: string } | null;
+  existing: {
+    durationSeconds: number | null;
+    generatedBy: string;
+    /**
+     * A short-lived signed link. The bucket is private, so there is no address that works
+     * without one, and minting it per view keeps a copied URL from outliving the session.
+     */
+    url: string | null;
+  } | null;
 }
 
 export async function getVoiceoverPreflight(
@@ -41,10 +49,20 @@ export async function getVoiceoverPreflight(
   if (!ctx) return { hasNarration: true, characters, estimate, existing: null };
 
   const existing = await findVoiceover(ctx.db, contentItemId, contentVersion);
+  if (!existing) return { hasNarration: true, characters, estimate, existing: null };
+
+  // Signed with the member's own client, not the service role: the bucket policy already grants
+  // read to members of the organization the path belongs to, so nothing needs elevating.
+  const signed = await ctx.db.storage.from("content-assets").createSignedUrl(existing.storagePath, 3600);
+
   return {
     hasNarration: true,
     characters,
     estimate,
-    existing: existing ? { durationSeconds: existing.durationSeconds, generatedBy: existing.generatedBy } : null,
+    existing: {
+      durationSeconds: existing.durationSeconds,
+      generatedBy: existing.generatedBy,
+      url: signed.data?.signedUrl ?? null,
+    },
   };
 }

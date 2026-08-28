@@ -299,7 +299,7 @@ interface Renderable {
   identity: BrandIdentity;
 }
 
-export function PlatformMockup({ variant, account, frames, identity, title }: Renderable & { title?: string }) {
+export function PlatformMockup({ variant, account, frames, identity, title, audio }: Renderable & { title?: string; audio?: { url: string; mimeType: string } | null }) {
   const shape = variant.detail.shape;
   const props = { variant, account, frames, identity };
   return (
@@ -310,7 +310,7 @@ export function PlatformMockup({ variant, account, frames, identity, title }: Re
       {shape === "carousel" && <Carousel {...props} />}
       {shape === "static" && <StaticPost {...props} />}
       {shape === "text" && <TextPost variant={variant} account={account} />}
-      <FrameExport variant={variant} frames={frames} identity={identity} title={title ?? variant.format} />
+      <FrameExport variant={variant} frames={frames} identity={identity} title={title ?? variant.format} audio={audio} />
       <p className="mock-disclaimer">
         Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance porque
         nada se publicó todavía; cualquier número acá sería inventado.

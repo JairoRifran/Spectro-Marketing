@@ -89,21 +89,42 @@ function copyFile(variant: PlatformContentVariant): string {
   return lines.join("\n");
 }
 
-export function FrameExport({ variant, frames, identity, title }: {
+export function FrameExport({ variant, frames, identity, title, audio }: {
   variant: PlatformContentVariant;
   frames: FrameSpec[];
   identity: BrandIdentity;
   title: string;
+  /** The produced voiceover, when there is one. Absent is normal, not a failure. */
+  audio?: { url: string; mimeType: string } | null;
 }) {
   const [state, setState] = useState<"idle" | "working" | "error">("idle");
+  // A pack that shipped without its audio is not a failure, but it is not silent either.
+  const [note, setNote] = useState<string | null>(null);
 
   async function download() {
     setState("working");
+    setNote(null);
     try {
       const entries: ZipEntry[] = [{ name: "copy.txt", bytes: new TextEncoder().encode(copyFile(variant)) }];
       for (const [index, frame] of frames.entries()) {
         const png = await toPng(drawFrame(frame, identity));
         entries.push({ name: `${variant.platform}-${String(index + 1).padStart(2, "0")}-${frame.label}.png`, bytes: png });
+      }
+
+      // The audio belongs in the pack: a piece is not ready to post without the voice that
+      // goes with it. A failure to fetch it must not lose the images, so the pack still ships.
+      if (audio?.url) {
+        try {
+          const response = await fetch(audio.url);
+          if (response.ok) {
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            entries.push({ name: `${variant.platform}-voz-en-off.${audio.mimeType.includes("wav") ? "wav" : "mp3"}`, bytes });
+          } else {
+            setNote("Las imágenes y el texto están; no se pudo agregar el audio al paquete.");
+          }
+        } catch {
+          setNote("Las imágenes y el texto están; no se pudo agregar el audio al paquete.");
+        }
       }
 
       const archive = createZip(entries);
@@ -123,9 +144,12 @@ export function FrameExport({ variant, frames, identity, title }: {
     <div className="frame-export">
       <button type="button" className="secondary-button" onClick={download} disabled={state === "working"}>
         <Download size={14} />
-        {state === "working" ? "Armando el paquete…" : frames.length > 0 ? `Descargar ${frames.length === 1 ? "la pieza" : `las ${frames.length} imágenes`} y el texto` : "Descargar el texto"}
+        {state === "working"
+          ? "Armando el paquete…"
+          : `Descargar ${frames.length > 0 ? `${frames.length === 1 ? "la pieza" : `las ${frames.length} imágenes`}, ` : ""}${audio?.url ? "la voz y " : ""}el texto`}
       </button>
       {state === "error" && <small className="form-error">No se pudo armar el paquete en este navegador.</small>}
+      {note && <small className="form-note">{note}</small>}
     </div>
   );
 }

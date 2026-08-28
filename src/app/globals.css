@@ -350,3 +350,6 @@
 .voiceover-action .secondary-button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#33433f;font-size:10px;font-weight:650}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.voiceover-ready{display:block}
+.voiceover-ready-head{display:flex;align-items:center;gap:10px}
+.voiceover-player{display:block;margin-top:9px;width:100%;max-width:300px;height:32px}

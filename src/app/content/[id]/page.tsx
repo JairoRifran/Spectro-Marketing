@@ -75,7 +75,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
             <h3>Cómo se va a consumir</h3>
             {variant ? (
               <PreviewTabs
-                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={composeFrames(variant.payload)} identity={SPECTRO_IDENTITY} title={item.title} />}
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={composeFrames(variant.payload)} identity={SPECTRO_IDENTITY} title={item.title} audio={voiceover.existing?.url ? { url: voiceover.existing.url, mimeType: "audio/mpeg" } : null} />}
                 production={<ContentPreview variant={variant.payload} />}
               />
             ) : <p className="panel-empty">Todavía no hay una versión escrita.</p>}

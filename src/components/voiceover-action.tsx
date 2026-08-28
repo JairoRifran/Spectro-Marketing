@@ -56,14 +56,21 @@ export function VoiceoverAction({ contentItemId, demo, preflight }: {
     <div className="voiceover-action">
       {preflight.existing ? (
         <div className="voiceover-ready">
-          <AudioLines size={15} />
-          <div>
-            <strong>Voz en off lista</strong>
-            <small>
-              {preflight.existing.durationSeconds ? `${Number(preflight.existing.durationSeconds).toFixed(1)}s · ` : ""}
-              {preflight.existing.generatedBy === "mock" ? "generada con el proveedor de prueba" : "generada con el proveedor real"}
-            </small>
+          <div className="voiceover-ready-head">
+            <AudioLines size={15} />
+            <div>
+              <strong>Voz en off lista</strong>
+              <small>
+                {preflight.existing.durationSeconds ? `${Number(preflight.existing.durationSeconds).toFixed(1)}s · ` : ""}
+                {preflight.existing.generatedBy === "mock" ? "generada con el proveedor de prueba" : "generada con el proveedor real"}
+              </small>
+            </div>
           </div>
+          {/* Saying it is ready without letting anyone hear it is the one thing this panel
+              exists to avoid. */}
+          {preflight.existing.url
+            ? <audio className="voiceover-player" controls preload="none" src={preflight.existing.url} aria-label="Escuchar la voz en off" />
+            : <small className="voiceover-note">El archivo existe pero no se pudo generar un enlace para escucharlo.</small>}
         </div>
       ) : (
         <>
