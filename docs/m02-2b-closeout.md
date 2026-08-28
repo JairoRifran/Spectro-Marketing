@@ -2,22 +2,75 @@
 
 ## Status
 
-`READY FOR PRODUCTION VALIDATION` — the vertical slice is complete and green locally. Nothing has
-been applied to production: migration `202608270005` is written and tested but **not applied**,
-and the branch is not merged.
+`IN PRODUCTION` — migration `202608270005` is applied, the branch is merged to `main`, and the
+Content Factory has been exercised against the production database by a real human operator.
+Four defects were found by running it and each was fixed with a regression that fails without
+the fix. One validation remains open and is named at the bottom.
 
-## Scope delivered
+## Production record
 
-- Deterministic planning from the campaign's own pillar weights, channels, formats and cadence.
-- Bruno, Clara and Emilia as three task types on the existing runtime, with contracts that make
-  role boundaries structural rather than advisory.
-- Five persisted entities with RLS, indexes, foreign keys, cross-organization triggers and a
-  database-enforced lifecycle.
-- Content Studio: `/content` with seven filters and pagination, `/content/[id]` as an editorial
-  review table with native previews per production shape.
-- Approve, reject and request-revision through the M01 approval engine, with versioning that
-  never overwrites a reviewed artefact.
-- Campaign content progress, Marketing HQ operational counters and navigation entry.
+| Item | Value |
+| --- | --- |
+| Migration | `202608270005_m02_2b_content_factory.sql`, applied, forward-only |
+| Campaign | Content Factory run against the approved production campaign |
+| Pieces produced | 11 approved + 1 quality-blocked |
+| Platforms exercised | instagram, linkedin, tiktok, youtube_shorts |
+| Blocked piece | `6ccf1423-4ccd-44ae-9934-269a116f12a6` (instagram / reel) |
+| Published | nothing |
+| Budget spent | nothing |
+
+## Defects found by running it in production
+
+Every one of these was invisible to the local suite and surfaced only against real data. Each
+fix ships with a test that was confirmed to fail when the defect is reintroduced.
+
+### 1. LinkedIn planned a format it cannot produce
+
+The planner offered `document_post`, the adapter produced a text post, and the shape check
+rejected the mismatch. `resolveFormat` now takes the adapter's own producible set as the
+preferred list, so an adapter can never be asked for a format it does not implement.
+
+### 2. A content decision was rendered as the campaign's strategy decision
+
+Content approvals carry `campaign_id`, so the campaign strategy query matched them. The panel
+showed a content decision as the strategy decision, and its Approve button would have decided
+the wrong artefact. The query now filters `content_item_id is null`. Fixed in `0f853a6`.
+
+### 3. An Instagram reel shipped without video direction
+
+The Instagram adapter described a carousel and a reel with identical fields, so a reel carried
+no `videoDirection` and no duration. The quality gate blocked it — 26/27 checks,
+`content.missing_video_direction` — which is the gate working correctly on a defect upstream of
+it. The adapter now branches on the produced format. Fixed in `29c2c71`.
+
+The regression for this one covers the whole class rather than the single case: it walks every
+platform/format pair an adapter claims it can produce and asserts the draft clears the quality
+gate. Any future adapter that omits a required field for one of its formats fails in tests.
+
+### 4. A blocked piece had no way forward
+
+A piece the quality gate sends back has no open approval, so `/api/content/[id]/decision`
+answered `409 no_open_approval` and `/content/[id]` rendered no actions at all. `needs_revision`
+and `rejected` were dead ends: the only exit was editing the database by hand.
+
+A rewrite is the one outcome that does not require a pending decision, so it no longer demands
+one. Approve and reject still go through the M01 approval engine untouched, and the UI hides
+them where there is nothing to decide. Fixed in `e5377e9`.
+
+## Corrections to earlier documentation
+
+Two claims recorded earlier in this milestone were wrong and are corrected here.
+
+**The synchronous runner does not prevent live progress.** It was previously stated that because
+the Content Factory runs inside the request that triggers it, progress could not be observed
+until the run finished. This is false and was disproven in production: the pipeline view polls
+on an independent request, so stage transitions were visible while the run was still in flight.
+Nothing about the runner architecture was changed to achieve this.
+
+**YouTube was exercised in production.** It was previously stated that the `youtube` →
+`youtube_shorts` channel-code mapping had not been covered by a production run. It was: the run
+produced `youtube_shorts` pieces, so the mapping was exercised end to end against real campaign
+configuration, in addition to its unit regression.
 
 ## Validation record
 
@@ -25,77 +78,34 @@ and the branch is not merged.
 lint             PASS
 typecheck        PASS
 build            PASS (Next.js 16.3.3)
-unit/integration 214 passed, 22 safely skipped without an isolated test project
-test:content     157 passed
-playwright       18 passed, 4 live tests safely skipped
+unit/integration 234 passed, 22 safely skipped without an isolated test project
+test:content     177 passed
+playwright       21 passed, 4 live tests safely skipped
 ```
 
 The 22 skipped tests are the remote suites: they require `TEST_ENVIRONMENT=true` and an isolated
-Supabase project, and the guard refuses production. `tests/integration/content-factory.test.ts`
-covers the persisted chain, approval, revision-to-v2, invalid transitions and organization
-isolation, and has never been executed because no isolated project exists.
-
-## What is proven locally
-
-- The chain runs end to end in unit tests: an approved campaign's configuration produces
-  concepts, native variants per platform, a creative review and a passing quality gate.
-- Variants of one concept stay differentiated across platforms; the duplication check reports
-  zero errors on generated sets.
-- The SQL transition table is asserted identical to the TypeScript one, so the two cannot drift.
-- Demo E2E covers list, detail, both preview shapes, quality reporting, the duplication warning,
-  the revision form's feedback requirement, and that an unapproved campaign offers no generation.
-
-## What is not proven
-
-- No migration has run against any database. The SQL is reviewed and unit-asserted, not executed.
-- The persisted chain, RLS isolation and the revision-to-v2 flow are covered by integration tests
-  that cannot run without an isolated Supabase project.
-- No production smoke test.
+Supabase project, and the guard refuses to run against production.
 
 ## Production safety
 
 ```text
 AUTOMATION_ENABLED   unchanged (false)
 Cron                 unchanged (spectro-dispatch-every-minute, active=false)
-Production migration none applied
+GET  /api/health     200, app=true, database=true
+POST /api/internal/jobs/dispatch  503 automation_disabled
 Content published    none
 External API calls   none
 Budget spent         none
-main branch          untouched
+Historical campaign  the campaign left in Researching is untouched
 ```
 
-The factory has no scheduled entry point. Its only trigger is an authenticated, authorised human
-action that first verifies the campaign strategy was approved.
+The factory still has no scheduled entry point. Its only trigger is an authenticated, authorised
+human action that first verifies the campaign strategy was approved.
 
-## Integration record (2026-08-27)
+## Open
 
-- Fast-forward merge of `claude/m02-content-factory` into `main`; zero divergence, no conflicts.
-- Commits `f4abba1` and `111c14f`; pushed `6b804b3..111c14f`.
-- Vercel deployment for `111c14f` reached **Ready** in Production, confirmed on the deployments
-  list rather than assumed from the push.
-- `GET /api/health` returned HTTP 200 with `app=true` and `database=true` after the deploy.
-- `POST /api/internal/jobs/dispatch` still answers `503 automation_disabled`.
-- Changes to files shared with the Campaign Brain work total eight additive lines across
-  `dashboard-shell`, `app/page`, `dispatcher` and `mock-provider`, plus six in the campaign detail.
-
-## Migration review (not applied)
-
-`202608270005` was reviewed line by line before hand-off:
-
-- No `drop`, `delete`, `truncate` or column removal anywhere; the single `update` is inside the
-  `apply_content_approval` trigger body, not a data migration.
-- Three added columns (`tasks`, `approvals`, `activity_log`), all nullable UUID foreign keys with
-  `on delete set null`, so existing rows are untouched.
-- RLS enabled with a member-read policy on all five new tables.
-- Eleven triggers: lifecycle enforcement, cross-organization reference guards and the approval
-  integration.
-- No `concurrently`, `vacuum` or `reindex`, so the whole file can run inside one transaction.
-- The file is 100% ASCII, so no clipboard or codepage can corrupt it in transit.
-
-It was not applied because this host has no Supabase CLI, no `psql` and no Docker, and driving the
-SQL Editor through browser automation is forbidden after the earlier incident.
-
-## Next step
-
-One integration pass: merge review, apply `202608270005` to production using the transactional
-SQL Editor procedure from M02.1, deploy, verify health, then run the manual smoke test.
+The revision chain — request revision → v2 → Emilia → quality gate → waiting_approval → approve
+v2 — has not yet been walked in production. It is covered by integration tests that cannot run
+without an isolated project. The fix in `e5377e9` makes the blocked Instagram reel the natural
+subject: rewriting it exercises the full chain, and the corrected adapter should now clear the
+gate that blocked v1.
