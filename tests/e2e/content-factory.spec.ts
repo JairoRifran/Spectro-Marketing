@@ -335,3 +335,41 @@ test("a piece can be downloaded as a ready-to-post pack", async ({ page }) => {
   // Not a blank canvas: a solid-colour frame compresses to almost nothing.
   expect(archive.length).toBeGreaterThan(20_000);
 });
+
+// Choosing the voice of a brand. The screen keeps two lists apart on purpose: what the vendor
+// account happens to hold, and what somebody decided to use and said where it is from.
+test("the voice screen separates the account's voices from the brand's", async ({ page }) => {
+  await page.goto("/settings/voice");
+  await expect(page.getByRole("heading", { name: "La voz de la marca" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Las que Spectro puede usar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Voces disponibles para cargar" })).toBeVisible();
+});
+
+test("every tone is offered with what it is for, not just its name", async ({ page }) => {
+  await page.goto("/settings/voice");
+  const tone = page.getByLabel("Tono");
+  await expect(tone).toContainText("Reflexiva — pausada");
+  await expect(tone).toContainText("Entusiasta — con energía");
+});
+
+test("a voice cannot be loaded without saying where it is from", async ({ page }) => {
+  await page.goto("/settings/voice");
+  // Guessing the region from a vendor label would put a Mexican voice on a Rioplatense brand.
+  const row = page.locator(".voice-available li").filter({ hasText: "Voz de prueba 2" });
+  await expect(row.getByRole("button", { name: "Cargar" })).toBeDisabled();
+  await row.getByLabel(/Región para/).selectOption("mexicana");
+  await expect(row.getByRole("button", { name: "Cargar" })).toBeEnabled();
+});
+
+test("an already loaded voice is not offered again", async ({ page }) => {
+  await page.goto("/settings/voice");
+  const row = page.locator(".voice-available li").filter({ hasText: "Voz de prueba 1" });
+  await expect(row).toContainText("Cargada");
+  await expect(row.getByRole("button", { name: "Cargar" })).toHaveCount(0);
+});
+
+test("the voice screen is reachable from the navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Voz" }).click();
+  await expect(page).toHaveURL(/\/settings\/voice$/);
+});

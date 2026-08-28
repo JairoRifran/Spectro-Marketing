@@ -303,3 +303,31 @@
 .frame-export button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#33433f;font-size:10px;font-weight:650}
 .frame-export button:hover:not(:disabled){border-color:var(--net);color:var(--net)}
 .frame-export button:disabled{opacity:.6}
+
+/* --- Voice settings ----------------------------------------------------------------------- */
+.voice-settings{display:grid;gap:18px}
+.panel-note{margin:0 0 14px;color:#66736f;font-size:11px;line-height:1.55;max-width:70ch}
+.voice-choice{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.voice-choice label{display:flex;flex-direction:column;gap:5px;min-width:180px;flex:1 1 220px}
+.voice-choice label>span{color:#8b9592;font-size:9px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}
+.voice-choice select{height:36px;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:11px;color:#233c37}
+.voice-status{margin:14px 0 0;display:flex;align-items:center;gap:7px;font-size:11px}
+.voice-status.ok{color:#12805f}
+.voice-status.warn{color:#8a5a17}
+
+.voice-list{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.voice-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.voice-list strong{display:block;font-size:12px;color:#233c37}
+.voice-list small{display:block;margin-top:2px;color:#8b9592;font-size:10px}
+
+.voice-available{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.voice-available li{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.voice-available li.is-loaded{background:#f6f9f8}
+.voice-available-main{min-width:200px;flex:1}
+.voice-available strong{display:block;font-size:12px;color:#233c37}
+.voice-available small{display:block;margin-top:2px;color:#8b9592;font-size:10px}
+.voice-assign{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.voice-assign select{height:32px;padding:0 8px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:10px;color:#233c37}
+.voice-assign .secondary-button,.voice-choice .primary-button{height:32px;padding:0 13px;border-radius:8px;font-size:10px;font-weight:650}
+.voice-assign .secondary-button{border:1px solid var(--line);background:#fff;color:#33433f}
+.voice-assign .secondary-button:disabled{opacity:.5}

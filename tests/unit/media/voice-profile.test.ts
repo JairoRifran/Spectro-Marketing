@@ -3,14 +3,13 @@ import { ElevenLabsProvider } from "@/server/media/elevenlabs-provider";
 import {
   deliveryFor,
   deliverySchema,
-  REGION_LABEL,
   selectVoice,
-  TONE_LABEL,
   voiceProfileSchema,
   voiceRegionSchema,
   voiceToneSchema,
   type CatalogueVoice,
 } from "@/server/media/voice-profile";
+import { REGION_LABEL, TONE_LABEL } from "@/features/media/vocabulary";
 
 const voice = (region: CatalogueVoice["region"], gender: CatalogueVoice["gender"], id: string): CatalogueVoice =>
   ({ providerVoiceId: id, region, gender, label: id });

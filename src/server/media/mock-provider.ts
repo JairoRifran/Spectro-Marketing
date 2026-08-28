@@ -1,4 +1,4 @@
-import { MediaProviderError, speechRequestSchema, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
+import { MediaProviderError, speechRequestSchema, type AvailableVoice, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
 import { durationSeconds, encodeWav, SAMPLE_RATE } from "./wav";
 
 // A provider that costs nothing and produces a file that really plays.
@@ -65,5 +65,17 @@ export class MockMediaProvider implements MediaProvider {
       costMicros: 0,
       generatedBy: "mock",
     };
+  }
+
+  /**
+   * A small, obviously fake catalogue so the assignment screen can be used and tested without a
+   * vendor. The names say what they are: nobody should be able to load these by accident and
+   * then wonder why the audio is a beep.
+   */
+  async listVoices(): Promise<AvailableVoice[]> {
+    return [
+      { providerVoiceId: "mock-voz-1", name: "Voz de prueba 1 (mock)", labels: { accent: "rioplatense", gender: "female" }, category: "mock" },
+      { providerVoiceId: "mock-voz-2", name: "Voz de prueba 2 (mock)", labels: { accent: "neutral", gender: "male" }, category: "mock" },
+    ];
   }
 }

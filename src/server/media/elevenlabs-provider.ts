@@ -1,4 +1,4 @@
-import { MediaProviderError, speechRequestSchema, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
+import { MediaProviderError, speechRequestSchema, type AvailableVoice, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
 import type { Delivery } from "./voice-profile";
 
 // The ElevenLabs adapter.
@@ -17,6 +17,7 @@ import type { Delivery } from "./voice-profile";
 // content into anything that captures errors.
 
 const ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech";
+const VOICES_ENDPOINT = "https://api.elevenlabs.io/v2/voices";
 const MODEL = "eleven_multilingual_v2";
 const OUTPUT_FORMAT = "mp3_44100_128";
 const TIMEOUT_MS = 30_000;
@@ -128,5 +129,49 @@ export class ElevenLabsProvider implements MediaProvider {
       providerRef: response.headers.get("request-id") ?? undefined,
       generatedBy: "provider",
     };
+  }
+
+  /**
+   * The voices this account has. Listing costs nothing, so it does not go through the ceiling.
+   *
+   * The vendor's labels come back untouched. Reading "accent: latin american" as a region would
+   * assign a Mexican voice to a Rioplatense brand on a guess, so the mapping is left to a person.
+   */
+  async listVoices(): Promise<AvailableVoice[]> {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(VOICES_ENDPOINT, {
+        method: "GET",
+        headers: { "xi-api-key": this.config.apiKey, accept: "application/json" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      throw new MediaProviderError("unavailable", this.name, "No se pudo listar las voces del proveedor.");
+    }
+
+    if (!response.ok) {
+      throw new MediaProviderError(reasonFor(response.status), this.name, `El proveedor de voz respondio ${response.status}.`);
+    }
+
+    const payload = (await response.json().catch(() => null)) as { voices?: unknown } | null;
+    if (!payload || !Array.isArray(payload.voices)) {
+      throw new MediaProviderError("unavailable", this.name, "El proveedor de voz devolvio una lista ilegible.");
+    }
+
+    return payload.voices.flatMap((entry) => {
+      const voice = entry as Record<string, unknown>;
+      const id = typeof voice.voice_id === "string" ? voice.voice_id : null;
+      // A voice with no identifier cannot be used, and keeping it would offer a dead option.
+      if (!id) return [];
+      const labels = voice.labels && typeof voice.labels === "object" ? (voice.labels as Record<string, unknown>) : {};
+      return [{
+        providerVoiceId: id,
+        name: typeof voice.name === "string" && voice.name.trim() ? voice.name : id,
+        labels: Object.fromEntries(Object.entries(labels).filter(([, value]) => typeof value === "string")) as Record<string, string>,
+        category: typeof voice.category === "string" ? voice.category : undefined,
+        description: typeof voice.description === "string" ? voice.description : undefined,
+        previewUrl: typeof voice.preview_url === "string" ? voice.preview_url : undefined,
+      }];
+    });
   }
 }

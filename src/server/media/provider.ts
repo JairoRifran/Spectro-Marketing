@@ -73,9 +73,31 @@ export class MediaProviderError extends Error {
   }
 }
 
+/**
+ * A voice the account has, as the vendor describes it.
+ *
+ * The vendor's own labels are carried through as hints and nothing more. An accent labelled
+ * "latin american" is not a region in this system's vocabulary, and mapping it automatically
+ * would assign a Mexican voice to a Rioplatense brand on a guess. A person assigns the region.
+ */
+export interface AvailableVoice {
+  providerVoiceId: string;
+  name: string;
+  /** Vendor labels verbatim: accent, gender, age, use case. Suggestions for a human, not a map. */
+  labels: Record<string, string>;
+  category?: string;
+  description?: string;
+  previewUrl?: string;
+}
+
 export interface MediaProvider {
   readonly name: string;
   /** What this request will be billed for, before it is sent. */
   billedCharacters(request: SpeechRequest): number;
   synthesizeSpeech(request: SpeechRequest): Promise<SpeechResult>;
+  /**
+   * The voices this account has, when the provider can enumerate them. Optional because not
+   * every provider will, and pretending otherwise would force a fake implementation.
+   */
+  listVoices?(): Promise<AvailableVoice[]>;
 }

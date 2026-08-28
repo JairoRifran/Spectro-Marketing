@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VOICE_GENDERS, VOICE_REGIONS, VOICE_TONES } from "@/features/media/vocabulary";
 
 // How an organization asks for a voice, without knowing anything about a vendor.
 //
@@ -16,26 +17,14 @@ import { z } from "zod";
 //     the organization actually has, and if nothing matches the answer is that nothing matches.
 //     Quietly substituting another accent would ship the wrong voice for a brand.
 
-export const voiceToneSchema = z.enum([
-  "reflexiva",
-  "entusiasta",
-  "comercial",
-  "cercana",
-  "autoritaria",
-  "informativa",
-]);
+// Built from the shared lists so the form and the validation cannot disagree about what exists.
+export const voiceToneSchema = z.enum(VOICE_TONES);
 export type VoiceTone = z.infer<typeof voiceToneSchema>;
 
-export const voiceRegionSchema = z.enum([
-  "rioplatense",
-  "mexicana",
-  "castellana",
-  "colombiana",
-  "neutra",
-]);
+export const voiceRegionSchema = z.enum(VOICE_REGIONS);
 export type VoiceRegion = z.infer<typeof voiceRegionSchema>;
 
-export const voiceGenderSchema = z.enum(["femenina", "masculina", "indistinta"]);
+export const voiceGenderSchema = z.enum(VOICE_GENDERS);
 export type VoiceGender = z.infer<typeof voiceGenderSchema>;
 
 export const voiceProfileSchema = z.object({
@@ -81,24 +70,6 @@ const TONE_DELIVERY: Record<VoiceTone, Delivery> = {
 export function deliveryFor(tone: VoiceTone): Delivery {
   return TONE_DELIVERY[tone];
 }
-
-/** What a person sees when choosing. Kept next to the vocabulary so the two cannot drift. */
-export const TONE_LABEL: Record<VoiceTone, string> = {
-  reflexiva: "Reflexiva — pausada, para explicar algo que requiere atención",
-  entusiasta: "Entusiasta — con energía, para algo que celebra o lanza",
-  comercial: "Comercial — persuasiva, para una oferta o un llamado directo",
-  cercana: "Cercana — conversacional, como hablarle a una persona",
-  autoritaria: "Autoritaria — firme, para una postura o un dato duro",
-  informativa: "Informativa — neutra, para datos y procedimientos",
-};
-
-export const REGION_LABEL: Record<VoiceRegion, string> = {
-  rioplatense: "Rioplatense (Uruguay, Argentina)",
-  mexicana: "Mexicana",
-  castellana: "Castellana (España)",
-  colombiana: "Colombiana",
-  neutra: "Español neutro",
-};
 
 /** One voice an organization has available, described the way it was asked for. */
 export interface CatalogueVoice {
