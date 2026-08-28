@@ -70,6 +70,17 @@ function demoListItems(): ContentListItem[] {
   }));
 }
 
+/** The subset of filters that is meaningful without a database behind it. */
+function applyDemoFilters(items: ContentListItem[], filters: ContentFilters) {
+  return items.filter((item) =>
+    (!filters.campaign || item.campaignId === filters.campaign)
+    && (!filters.platform || item.platform === filters.platform)
+    && (!filters.format || item.format === filters.format)
+    && (!filters.status || item.status === filters.status)
+    && (!filters.pillar || item.pillar === filters.pillar)
+    && (!filters.agent || item.agentName === filters.agent));
+}
+
 type ConceptJoin = { pillar: string; angle: string } | null;
 type CampaignJoin = { id: string; name: string } | null;
 type AgentJoin = { display_name: string } | null;
@@ -77,7 +88,8 @@ type AgentJoin = { display_name: string } | null;
 export async function getContentList(filters: ContentFilters) {
   const ctx = isDemoMode ? null : await getOrganizationContext();
   if (!ctx) {
-    const items = isDemoMode ? demoListItems() : [];
+    // Demo has to honour the same filters as live, or the filter bar reads as broken.
+    const items = isDemoMode ? applyDemoFilters(demoListItems(), filters) : [];
     return { mode: (isDemoMode ? "demo" : "live") as "demo" | "live", orgName: isDemoMode ? "Northstar Urban" : "Sin organización", items, total: items.length, page: 1, pageSize: CONTENT_PAGE_SIZE, campaigns: (isDemoMode ? [{ id: DEMO_CAMPAIGN.id, name: DEMO_CAMPAIGN.name }] : []) as CampaignJoin[] };
   }
 
@@ -242,4 +254,42 @@ export async function getContentOperationalCounts() {
     waitingApproval: count(["waiting_approval"]),
     ready: count(["ready", "approved"]),
   };
+}
+
+export type GalleryItem = ContentListItem & { variant: PlatformContentVariant | null };
+
+/**
+ * The list, plus the written version of each piece, so the gallery can render every one inside
+ * the chrome of its own platform. One extra query for the whole page rather than one per card.
+ *
+ * A piece with no variant yet is kept in the result rather than dropped: "planned but not
+ * written" is a real state, and hiding it would misreport how much exists.
+ */
+export async function getContentGallery(filters: ContentFilters): Promise<Omit<Awaited<ReturnType<typeof getContentList>>, "items"> & { items: GalleryItem[] }> {
+  const list = await getContentList(filters);
+  if (list.items.length === 0) return { ...list, items: [] };
+
+  if (list.mode === "demo") {
+    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null })) };
+  }
+
+  const ctx = await getOrganizationContext();
+  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null })) };
+
+  const { data } = await ctx.db
+    .from("content_variants")
+    .select("content_item_id,version,payload")
+    .eq("organization_id", ctx.orgId)
+    .in("content_item_id", list.items.map((item) => item.id));
+
+  const rows = (data ?? []) as Array<{ content_item_id: string; version: number; payload: unknown }>;
+  const items = list.items.map((item) => {
+    const forItem = rows.filter((row) => row.content_item_id === item.id);
+    // The version the item currently points at; if that row is missing, the newest one written.
+    const chosen = forItem.find((row) => row.version === item.currentVersion)
+      ?? [...forItem].sort((a, b) => b.version - a.version)[0];
+    return { ...item, variant: (chosen?.payload as PlatformContentVariant | undefined) ?? null };
+  });
+
+  return { ...list, items };
 }

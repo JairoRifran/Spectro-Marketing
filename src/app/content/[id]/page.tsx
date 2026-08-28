@@ -5,6 +5,9 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { StatusPill, WorkspacePage } from "@/components/workspace-page";
 import { ContentActions } from "@/components/content-actions";
 import { ContentPreview, FORMAT_LABEL, PLATFORM_LABEL } from "@/components/content-preview";
+import { PlatformMockup } from "@/components/platform-mockup";
+import { accountFor } from "@/features/content/account";
+import { PreviewTabs } from "@/components/preview-tabs";
 import { getContentDetail } from "@/features/content/data";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +68,12 @@ export default async function ContentDetailPage({ params, searchParams }: { para
           <section className="detail-panel wide">
             <span className="section-kicker">PREVIEW</span>
             <h3>Cómo se va a consumir</h3>
-            {variant ? <ContentPreview variant={variant.payload} /> : <p className="panel-empty">Todavía no hay una versión escrita.</p>}
+            {variant ? (
+              <PreviewTabs
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} />}
+                production={<ContentPreview variant={variant.payload} />}
+              />
+            ) : <p className="panel-empty">Todavía no hay una versión escrita.</p>}
           </section>
 
           {review && (

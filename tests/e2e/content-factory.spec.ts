@@ -28,13 +28,15 @@ test("content detail shows context, native preview, quality and lineage", async 
   await expect(page.getByText("Control determinístico")).toBeVisible();
   await expect(page.getByText("Cómo llegó hasta acá")).toBeVisible();
 
-  // The preview renders the piece as its real shape, never as raw JSON.
+  // The production view renders the piece as its real shape, never as raw JSON.
+  await page.getByRole("tab", { name: "Producción" }).click();
   await expect(page.locator(".content-preview")).toBeVisible();
   await expect(page.getByText(/^\{/)).toHaveCount(0);
 });
 
 test("an Instagram carousel renders as slides with a caption and visual direction", async ({ page }) => {
   await page.goto("/content/00000000-0000-0000-0000-000000000601");
+  await page.getByRole("tab", { name: "Producción" }).click();
   await expect(page.locator(".preview-carousel")).toBeVisible();
   await expect(page.getByText("Portada", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "Láminas del carrusel" })).toBeVisible();
@@ -43,6 +45,7 @@ test("an Instagram carousel renders as slides with a caption and visual directio
 
 test("a TikTok piece renders as a script with scenes and an estimated duration", async ({ page }) => {
   await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  await page.getByRole("tab", { name: "Producción" }).click();
   await expect(page.locator(".preview-video")).toBeVisible();
   await expect(page.getByText("Escena 1")).toBeVisible();
   await expect(page.getByText("Texto en pantalla").first()).toBeVisible();
@@ -192,4 +195,73 @@ test("a stage that never ran says so instead of inventing a delivery", async ({ 
   const explain = pipeline.locator(".pipeline-explain");
   await expect(explain).toContainText("Emilia");
   await expect(explain).toContainText("Todavía no le tocó trabajar en esto.");
+});
+
+// The simulation exists to make an unpublished piece tangible. Its hard rule is that it must not
+// invent the one thing it cannot know: how the piece performed. Nothing is published, so any
+// like, view or reach count on screen would be fabricated.
+test("the platform simulation never shows an engagement number", async ({ page }) => {
+  await page.goto("/content?view=feed");
+  const gallery = page.locator(".content-gallery");
+  await expect(gallery).toBeVisible();
+
+  const mockups = gallery.locator(".platform-mockup");
+  await expect(mockups.first()).toBeVisible();
+
+  const text = await mockups.first().innerText();
+  // No counts next to the affordances, and no metric vocabulary at all.
+  expect(text).not.toMatch(/\d[\d.,]*\s*(me gusta|likes?|vistas|views|reproducciones|comentarios|compartidos|seguidores|alcance|impresiones)/i);
+  expect(text).not.toMatch(/\b\d[\d.,]*\s*[KMkm]\b/);
+  await expect(mockups.first()).toContainText(/cualquier número acá sería inventado/i);
+});
+
+test("each piece is simulated inside the chrome of its own platform", async ({ page }) => {
+  await page.goto("/content?view=feed");
+  const gallery = page.locator(".content-gallery");
+
+  // The demo set is one Instagram carousel and one TikTok vertical video: two different shapes,
+  // so a single generic card would be the wrong answer for at least one of them.
+  await expect(gallery.locator(".platform-mockup.on-instagram")).toHaveCount(1);
+  await expect(gallery.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
+  await expect(gallery.locator(".platform-mockup.on-tiktok .mock-phone")).toBeVisible();
+  await expect(gallery.locator(".platform-mockup.on-instagram .mock-dots")).toBeVisible();
+});
+
+test("switching to the simulation keeps the filters you already applied", async ({ page }) => {
+  await page.goto("/content?platform=tiktok");
+  await page.getByRole("link", { name: "Cómo se va a ver" }).click();
+  await expect(page).toHaveURL(/platform=tiktok/);
+  await expect(page).toHaveURL(/view=feed/);
+  await expect(page.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
+  await expect(page.locator(".platform-mockup.on-instagram")).toHaveCount(0);
+});
+
+test("a caption is shown truncated the way a feed would truncate it", async ({ page }) => {
+  await page.goto("/content?view=feed&platform=instagram");
+  const caption = page.locator(".platform-mockup.on-instagram .mock-caption");
+  await expect(caption.getByRole("button", { name: "más" })).toBeVisible();
+  await caption.getByRole("button", { name: "más" }).click();
+  await expect(caption.getByRole("button", { name: "ver menos" })).toBeVisible();
+});
+
+test("the detail page offers the simulation and the production view of the same piece", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  // It opens on the simulation, which is the one a person can judge without being briefed.
+  await expect(page.locator(".platform-mockup .mock-phone")).toBeVisible();
+  await page.getByRole("tab", { name: "Producción" }).click();
+  await expect(page.getByText("HOOK").first()).toBeVisible();
+  await expect(page.locator(".platform-mockup")).toHaveCount(0);
+});
+
+// The filter bar used to be inert in demo mode: it rendered, accepted a choice and returned the
+// full list regardless. A control that silently ignores you is worse than no control.
+test("the filter bar actually filters", async ({ page }) => {
+  await page.goto("/content");
+  const allRows = await page.locator("tbody tr").count();
+  expect(allRows).toBeGreaterThan(1);
+
+  await page.goto("/content?platform=tiktok");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.locator("tbody")).toContainText("TikTok");
+  await expect(page.locator("tbody")).not.toContainText("Instagram");
 });

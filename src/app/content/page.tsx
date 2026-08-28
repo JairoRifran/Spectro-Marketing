@@ -2,7 +2,9 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { FilterBar, StatusPill, WorkspacePage } from "@/components/workspace-page";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/components/content-preview";
-import { CONTENT_PAGE_SIZE, getContentList, type ContentFilters } from "@/features/content/data";
+import { CONTENT_PAGE_SIZE, getContentGallery, type ContentFilters } from "@/features/content/data";
+import { PlatformMockup } from "@/components/platform-mockup";
+import { accountFor } from "@/features/content/account";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
 import { CONTENT_FORMATS } from "@/server/content/platforms";
 
@@ -16,9 +18,21 @@ function Quality({ passed, total }: { passed: number | null; total: number | nul
   return <span className={clean ? "quality-cell clean" : "quality-cell partial"}>{passed}/{total} checks</span>;
 }
 
-export default async function ContentPage({ searchParams }: { searchParams: Promise<ContentFilters> }) {
+type ViewMode = "table" | "feed";
+
+/** Keeps the active filters when switching view, so the toggle never silently resets a search. */
+function withView(filters: ContentFilters, view: ViewMode) {
+  const query = new URLSearchParams(Object.entries(filters).filter(([key, value]) => key !== "view" && Boolean(value)) as [string, string][]);
+  if (view === "feed") query.set("view", "feed");
+  const suffix = query.toString();
+  return suffix ? `/content?${suffix}` : "/content";
+}
+
+export default async function ContentPage({ searchParams }: { searchParams: Promise<ContentFilters & { view?: string }> }) {
   const filters = await searchParams;
-  const data = await getContentList(filters);
+  const view: ViewMode = filters.view === "feed" ? "feed" : "table";
+  const data = await getContentGallery(filters);
+  const account = accountFor(data.orgName);
   const pages = Math.max(1, Math.ceil(data.total / CONTENT_PAGE_SIZE));
   const pillars = Array.from(new Set(data.items.map((item) => item.pillar))).filter((pillar) => pillar !== "—");
   const agents = Array.from(new Set(data.items.map((item) => item.agentName).filter(Boolean))) as string[];
@@ -29,6 +43,12 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         eyebrow="CONTENT FACTORY"
         title="Contenido"
         description="Cada pieza nace de una campaña aprobada y se revisa antes de aprobarse. Todavía no se publica nada."
+        action={
+          <div className="view-switch" role="group" aria-label="Modo de vista">
+            <Link href={withView(filters, "table")} className={view === "table" ? "is-active" : ""} aria-current={view === "table" ? "true" : undefined}>Tabla</Link>
+            <Link href={withView(filters, "feed")} className={view === "feed" ? "is-active" : ""} aria-current={view === "feed" ? "true" : undefined}>Cómo se va a ver</Link>
+          </div>
+        }
       >
         <FilterBar>
           <select name="campaign" defaultValue={filters.campaign} aria-label="Filtrar por campaña">
@@ -72,6 +92,24 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
           </div>
         ) : (
           <>
+            {view === "feed" ? (
+              <div className="content-gallery">
+                {data.items.map((item) => (
+                  <article key={item.id} className="gallery-card">
+                    <header>
+                      <div>
+                        <Link href={`/content/${item.id}`}>{item.title}</Link>
+                        <small>{PLATFORM_LABEL[item.platform] ?? item.platform} · {FORMAT_LABEL[item.format] ?? item.format} · v{item.currentVersion}</small>
+                      </div>
+                      <StatusPill value={item.status} />
+                    </header>
+                    {item.variant
+                      ? <PlatformMockup variant={item.variant} account={account} />
+                      : <p className="panel-empty">Planificada, todavía sin escribir.</p>}
+                  </article>
+                ))}
+              </div>
+            ) : (
             <div className="table-shell">
               <table>
                 <thead>
@@ -99,11 +137,13 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                 </tbody>
               </table>
             </div>
+            )}
             {pages > 1 && (
               <nav className="content-pagination" aria-label="Paginación">
                 {Array.from({ length: pages }, (_, index) => index + 1).map((number) => {
                   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]);
                   query.set("page", String(number));
+                  if (view === "feed") query.set("view", "feed");
                   return <Link key={number} href={`/content?${query}`} className={number === data.page ? "active" : ""} aria-current={number === data.page ? "page" : undefined}>{number}</Link>;
                 })}
               </nav>
