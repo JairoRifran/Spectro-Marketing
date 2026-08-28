@@ -29,7 +29,11 @@ export type SpeechRequest = z.infer<typeof speechRequestSchema>;
 export interface SpeechResult {
   bytes: Uint8Array;
   mimeType: string;
-  durationSeconds: number;
+  /**
+   * Absent when the provider cannot cheaply know it. A vendor returning compressed audio would
+   * have to be decoded to measure, and a fabricated length is worse than an honest gap.
+   */
+  durationSeconds?: number;
   /** What the vendor reported charging, when it reports one at all. */
   costMicros?: Micros;
   /** The vendor's own identifier for the call, for reconciling against an invoice. */

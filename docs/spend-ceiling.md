@@ -66,7 +66,19 @@ values ('<organization-id>', null, 5000000)
 on conflict do nothing;
 ```
 
+## What the vendor does and does not tell us
+
+The ElevenLabs text-to-speech endpoint answers with the audio bytes and publishes no usage or
+cost header, so there is nothing truthful to settle with except the estimate. That is why
+settling with the estimate is a supported path rather than a bug: the alternative would be
+inventing a number and putting it in a ledger meant to match an invoice.
+
+For the same reason the estimate has to be built from the exact string sent to the vendor.
+Estimating from the script and then sending something longer would enforce the ceiling against a
+number unrelated to what is billed.
+
 ## Not covered
 
-No provider calls this yet. The ceiling exists, is enforced and is tested; what it guards has
-still to be built. Nothing in Spectro spends money today.
+Nothing calls this from a route yet, so Spectro still spends nothing. The mock provider is used
+whenever `ELEVENLABS_API_KEY` or `ELEVENLABS_VOICE_ID` is unset, and it costs nothing and returns
+a tone that could not be mistaken for speech.

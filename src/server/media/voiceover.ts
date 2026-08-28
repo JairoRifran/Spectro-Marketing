@@ -69,7 +69,7 @@ export async function synthesizeVoiceover(
         // Settle with what the vendor charged when it says so; the estimate is the fallback.
         actualMicros: result.costMicros,
         // Enough to reconcile against an invoice, and nothing that could be a prompt or a key.
-        summary: `${provider.billedCharacters(request)} caracteres, ${result.durationSeconds.toFixed(1)}s`,
+        summary: [`${provider.billedCharacters(request)} caracteres`, result.durationSeconds ? `${result.durationSeconds.toFixed(1)}s` : null].filter(Boolean).join(", "),
       };
     },
   );
