@@ -155,3 +155,47 @@ describe("the misconfigured key hint", () => {
     expect(body).toContain('key.startsWith("sk_")) return ""');
   });
 });
+
+// A table that could be read but never written shipped once. The screen reported "no voices
+// loaded", which is exactly what an empty table looks like, so the refusal was indistinguishable
+// from having never pressed the button.
+describe("writing the brand's voices", () => {
+  const policy = readFileSync(new URL("../../../supabase/migrations/202608280003_brand_voices_write_policy.sql", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../../../src/app/api/media/voices/route.ts", import.meta.url), "utf8");
+  const screen = readFileSync(new URL("../../../src/components/voice-settings.tsx", import.meta.url), "utf8");
+
+  it("grants the writes the screen actually performs", () => {
+    for (const verb of ["insert", "update", "delete"]) {
+      expect(policy, verb).toContain(`for ${verb} to authenticated`);
+    }
+  });
+
+  it("keeps a viewer out at the database, not only at the route", () => {
+    expect(policy).not.toContain("'viewer'");
+    expect(policy.match(/has_org_role/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(route).toContain('context.role === "viewer"');
+  });
+
+  it("tells a policy refusal apart from a duplicate and from anything else", () => {
+    // Each is a different thing to do next, and one message for all three tells you none of them.
+    expect(route).toContain('error.code === "23505"');
+    expect(route).toContain('error.code === "42501"');
+    expect(route).toContain("forbidden_by_policy");
+  });
+
+  it("names a policy refusal in words rather than as a generic failure", () => {
+    expect(screen).toContain("forbidden_by_policy");
+    expect(screen).toMatch(/politica de escritura/i);
+  });
+
+  it("shows the notice beside the action instead of at the foot of the page", () => {
+    // A failure nobody sees reads as nothing happening, which is what actually occurred.
+    expect(screen).toContain("const notice = message ?");
+    expect(screen.match(/\{notice\}/g)?.length).toBe(2);
+  });
+
+  it("stays pure ASCII and adds nothing destructive", () => {
+    expect(/^[\x00-\x7F]*$/.test(policy)).toBe(true);
+    expect(policy).not.toMatch(/\b(drop table|drop policy|truncate|delete from)\b/i);
+  });
+});

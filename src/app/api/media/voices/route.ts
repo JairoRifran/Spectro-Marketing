@@ -49,14 +49,22 @@ export async function POST(request: Request) {
       gender: parsed.data.gender,
       label: parsed.data.label,
     });
-    // The unique index refuses the same vendor voice twice; that is a duplicate, not a failure.
-    if (error) return Response.json({ error: error.code === "23505" ? "already_added" : "insert_failed" }, { status: 409 });
+    // Told apart on purpose. A duplicate is not a failure, and a policy refusal is a
+    // configuration problem that looks identical to an empty table if it is not named.
+    if (error) {
+      if (error.code === "23505") return Response.json({ error: "already_added" }, { status: 409 });
+      if (error.code === "42501") return Response.json({ error: "forbidden_by_policy" }, { status: 403 });
+      return Response.json({ error: "insert_failed" }, { status: 400 });
+    }
     return Response.json({ ok: true });
   }
 
   if (parsed.data.action === "remove_voice") {
     const { error } = await context.db.from("brand_voices").delete().eq("id", parsed.data.id).eq("organization_id", context.orgId);
-    if (error) return Response.json({ error: "delete_failed" }, { status: 400 });
+    if (error) {
+      if (error.code === "42501") return Response.json({ error: "forbidden_by_policy" }, { status: 403 });
+      return Response.json({ error: "delete_failed" }, { status: 400 });
+    }
     return Response.json({ ok: true });
   }
 

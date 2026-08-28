@@ -45,13 +45,21 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
     setBusy(false);
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      setMessage(payload?.error === "already_added" ? "Esa voz ya estaba cargada." : failure);
+      setMessage(
+        payload?.error === "already_added" ? "Esa voz ya estaba cargada."
+          : payload?.error === "forbidden_by_policy" ? "La base de datos rechazo el cambio: falta la politica de escritura sobre las voces."
+          : failure,
+      );
       return;
     }
     router.refresh();
   }
 
   const loadedIds = new Set(data.loaded.map((voice) => voice.providerVoiceId));
+
+  // Rendered beside whatever was pressed. A single notice at the foot of the page is invisible
+  // to somebody scrolled down to the list, and a failure nobody sees reads as nothing happening.
+  const notice = message ? <p className="form-error voice-notice">{message}</p> : null;
 
   return (
     <div className="voice-settings">
@@ -106,6 +114,7 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
             : <p className="voice-status warn"><CircleAlert size={14} /> No hay ninguna voz cargada para {REGION_LABEL[data.profile.region] ?? data.profile.region}. Cargá una abajo.</p>
         )}
         {!data.profile && <p className="voice-status warn"><CircleAlert size={14} /> Todavía no elegiste tono ni región.</p>}
+        {notice}
       </section>
 
       <section className="detail-panel wide">
@@ -200,9 +209,8 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
             })}
           </ul>
         )}
+        {notice}
       </section>
-
-      {message && <p className="form-error">{message}</p>}
     </div>
   );
 }

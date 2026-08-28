@@ -331,3 +331,4 @@
 .voice-assign .secondary-button,.voice-choice .primary-button{height:32px;padding:0 13px;border-radius:8px;font-size:10px;font-weight:650}
 .voice-assign .secondary-button{border:1px solid var(--line);background:#fff;color:#33433f}
 .voice-assign .secondary-button:disabled{opacity:.5}
+.voice-notice{margin:12px 0 0;font-size:11px}
