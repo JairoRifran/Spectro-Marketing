@@ -392,3 +392,4 @@
 
 .gallery-state{margin-top:14px;padding-top:12px;border-top:1px solid #eef1f0;display:grid;gap:8px}
 .gallery-state .voiceover-compact{margin-top:0}
+.image-done{display:flex;align-items:center;gap:9px}

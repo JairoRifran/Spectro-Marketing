@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildImageRequest } from "@/server/media/image-brief";
+import { buildImageRequest, looksLikeProductionNote } from "@/server/media/image-brief";
 import { composeFrames } from "@/server/media/compose";
 import { canvasFor } from "@/server/media/canvas";
 import { imageRequestSchema } from "@/server/media/image-provider";
@@ -11,8 +12,8 @@ const brand = {
   forbiddenClaims: [], informalityCeiling: "conversational" as const, visualInstructions: "",
 };
 const concept: ContentConcept = {
-  conceptId: "C1", title: "T", internalName: "t", pillar: "Educacion", angle: "A", objective: "educational",
-  audience: { persona: "P", problem: "Pr.", promise: "Pm." }, coreIdea: "Idea.",
+  conceptId: "C1", title: "T", internalName: "t", pillar: "Educacion", angle: "Marketing con continuidad", objective: "educational",
+  audience: { persona: "Responsable de marketing en una PyME B2B", problem: "Pr.", promise: "Pm." }, coreIdea: "Idea.",
   hookDirection: { preferredTypes: ["problem"] }, format: "carousel",
   platforms: ["instagram"], cta: "save", evidenceRequired: [], creativeNotes: [],
 };
@@ -21,79 +22,110 @@ const draft = (platform: "instagram" | "tiktok", format: ContentConcept["format"
 
 const carousel = draft("instagram", "carousel");
 const video = draft("tiktok", "short_video");
+const context = { pillar: "Educacion", angle: "Marketing con continuidad", audience: "Responsable de marketing en una PyME B2B" };
+
+describe("telling a subject from a production note", () => {
+  it("recognises a note about how the frame is built", () => {
+    // "Cover legible at 160 px" says nothing about what is in the picture. Sending it as the
+    // subject is what produced a swimwear model on a B2B marketing carousel.
+    for (const note of ["Portada legible a 160 px", "Tipografia de alto contraste", "Encuadre vertical", "Texto fuera de la zona segura"]) {
+      expect(looksLikeProductionNote(note), note).toBe(true);
+    }
+  });
+
+  it("recognises a note that actually describes a scene", () => {
+    for (const note of ["Escritorio con notas adhesivas y una laptop", "Dos personas revisando un tablero"]) {
+      expect(looksLikeProductionNote(note), note).toBe(false);
+    }
+  });
+});
 
 describe("what to draw", () => {
   it("builds a valid request for every frame the composition produces", () => {
     for (const variant of [carousel, video]) {
       for (const frame of composeFrames(variant)) {
-        const request = buildImageRequest(variant, frame.key);
+        const request = buildImageRequest(variant, frame.key, context);
         if (!request) continue;
         expect(() => imageRequestSchema.parse(request), frame.key).not.toThrow();
       }
     }
   });
 
-  it("takes the direction the piece already wrote rather than inventing a subject", () => {
-    if (carousel.detail.shape !== "carousel") throw new Error("expected a carousel");
-    const request = buildImageRequest(carousel, "slide-0")!;
-    expect(request.prompt).toContain(carousel.detail.carousel.cover.visualNote);
+  it("says what the piece is about, taken from the campaign", () => {
+    const prompt = buildImageRequest(carousel, "slide-0", context)!.prompt;
+    expect(prompt).toContain("Marketing con continuidad");
+    expect(prompt).toContain("Educacion");
+    expect(prompt).toContain("PyME B2B");
+  });
+
+  it("never sends a production note as the subject", () => {
+    const prompt = buildImageRequest(carousel, "slide-0", context)!.prompt;
+    expect(prompt).not.toContain("160 px");
+    expect(prompt).not.toMatch(/legible/i);
+  });
+
+  it("uses a visual note that genuinely describes a scene", () => {
+    const scened = {
+      ...carousel,
+      detail: {
+        shape: "carousel" as const,
+        carousel: {
+          ...(carousel.detail.shape === "carousel" ? carousel.detail.carousel : ({} as never)),
+          cover: { headline: "h", visualNote: "Escritorio con notas adhesivas y una laptop abierta" },
+        },
+      },
+    };
+    expect(buildImageRequest(scened, "slide-0", context)!.prompt).toContain("notas adhesivas");
+  });
+
+  it("anchors the style, because the drift is not random", () => {
+    // Without an anchor it goes to fantasy illustration and stock glamour, which is the wrong
+    // register for every brand this is likely to serve.
+    const prompt = buildImageRequest(carousel, "slide-0", context)!.prompt;
+    expect(prompt.toLowerCase()).toContain("fotografia editorial realista");
+    expect(prompt.toLowerCase()).toContain("sin fantasia");
+    expect(prompt.toLowerCase()).toContain("sin modelos posando");
   });
 
   it("forbids text in the picture", () => {
     // The typography is composed on top at delivery size. A picture that already contains words
     // produces a frame with two headlines, one of them misspelled.
-    const request = buildImageRequest(carousel, "slide-0")!;
-    expect(request.prompt.toLowerCase()).toContain("sin texto");
-    expect(request.prompt.toLowerCase()).toContain("sin logos");
+    const prompt = buildImageRequest(carousel, "slide-0", context)!.prompt;
+    expect(prompt.toLowerCase()).toContain("sin texto");
+    expect(prompt.toLowerCase()).toContain("sin logos");
   });
 
   it("asks for room where the headline goes", () => {
-    // A subject centred under the composed title is a subject wearing a caption.
-    expect(buildImageRequest(carousel, "slide-0")!.prompt.toLowerCase()).toContain("espacio libre");
+    expect(buildImageRequest(carousel, "slide-0", context)!.prompt.toLowerCase()).toContain("espacio libre");
   });
 
   it("asks at the frame's own delivery proportions", () => {
-    // A square picture cropped into a 9:16 frame loses the half the direction was written about.
     const canvas = canvasFor(video.platform, video.format);
-    const request = buildImageRequest(video, "cover")!;
+    const request = buildImageRequest(video, "cover", context)!;
     expect(request.width).toBe(canvas.width);
     expect(request.height).toBe(canvas.height);
   });
 
   it("gives different frames different pictures, and the same frame the same one", () => {
-    const first = buildImageRequest(carousel, "slide-0")!;
-    const second = buildImageRequest(carousel, "slide-1")!;
+    const first = buildImageRequest(carousel, "slide-0", context)!;
+    const second = buildImageRequest(carousel, "slide-1", context)!;
     expect(first.seed).not.toBe(second.seed);
-    expect(buildImageRequest(carousel, "slide-0")!.seed).toBe(first.seed);
+    expect(buildImageRequest(carousel, "slide-0", context)!.seed).toBe(first.seed);
   });
 
   it("includes the brand's own visual instructions when there are any", () => {
-    const request = buildImageRequest(carousel, "slide-0", "Paleta fria, fotografia documental")!;
+    const request = buildImageRequest(carousel, "slide-0", { ...context, brandVisualInstructions: "Paleta fria, documental" })!;
     expect(request.prompt).toContain("Paleta fria");
   });
 
-  it("asks for nothing when the piece never said what to draw", () => {
-    // Inventing a subject would put an image on a brand's channel that nobody chose, and a
-    // designed surface with no photograph is a perfectly good frame.
-    const blank = {
-      ...carousel,
-      visualDirection: "",
-      detail: {
-        shape: "carousel" as const,
-        carousel: {
-          cover: { headline: "h", visualNote: "" },
-          slides: [{ headline: "h", visualNote: "" }],
-          ctaSlide: { headline: "h", visualNote: "" },
-          caption: "c",
-          visualDirection: "",
-        },
-      },
-    };
-    expect(buildImageRequest(blank, "slide-0")).toBeNull();
+  it("asks for nothing when neither the campaign nor the piece says anything", () => {
+    // With neither, the prompt would be style and prohibitions only — the empty brief that
+    // produced pictures unrelated to the content.
+    expect(buildImageRequest(carousel, "slide-0", {})).toBeNull();
   });
 
   it("never exceeds the prompt length the contract allows", () => {
-    const request = buildImageRequest(carousel, "slide-0", "x".repeat(3_000))!;
+    const request = buildImageRequest(carousel, "slide-0", { ...context, brandVisualInstructions: "x".repeat(3_000) })!;
     expect(request.prompt.length).toBeLessThanOrEqual(1_000);
   });
 });
@@ -124,5 +156,27 @@ describe("the frame reserves a place for it", () => {
       expect(picture.width).toBe(frame.width);
       expect(picture.height).toBe(frame.height);
     }
+  });
+});
+
+// A picture that came back wrong is not something to live with, but replacing one has to be
+// deliberate: reuse is what keeps a second look from being a second charge.
+describe("replacing a picture", () => {
+  const producer = readFileSync(new URL("../../../src/server/media/voiceover-asset.ts", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../../../src/app/api/content/[id]/image/route.ts", import.meta.url), "utf8");
+  const screen = readFileSync(new URL("../../../src/components/image-actions.tsx", import.meta.url), "utf8");
+
+  it("reuses by default and only skips the check when asked", () => {
+    expect(producer).toContain("regenerate = false");
+    expect(producer).toContain("const existing = regenerate ? null : await findAsset(");
+  });
+
+  it("never lets a request turn it on by accident", () => {
+    expect(route).toContain("regenerate: z.boolean().default(false)");
+  });
+
+  it("offers it only where a picture already exists", () => {
+    expect(screen).toContain("generate(frame.key, true)");
+    expect(screen).toMatch(/Rehacer/);
   });
 });

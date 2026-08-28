@@ -20,6 +20,8 @@ const bodySchema = z.object({
   /** Which frame to draw. Validated against the piece's own composition, never trusted. */
   slot: z.string().trim().min(1).max(60),
   requestId: z.string().trim().min(8).max(120),
+  /** Replace a picture that already exists. Deliberate, never the default. */
+  regenerate: z.boolean().default(false),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -65,6 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         idempotencyKey: `image:${id}:v${item.current_version}:${parsed.data.slot}:${parsed.data.requestId}`,
       },
       parsed.data.slot,
+      parsed.data.regenerate,
     );
 
     if ("problem" in result) return Response.json({ error: result.problem }, { status: 409 });

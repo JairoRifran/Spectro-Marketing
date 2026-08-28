@@ -265,18 +265,37 @@ export async function produceImage(
   admin: SupabaseClient,
   input: ProduceInput,
   slot: string,
+  /**
+   * Ask again for a frame that already has a picture.
+   *
+   * Reuse is the default because it is what keeps a second look from being a second charge. But
+   * a picture that came back wrong is not something to live with, so replacing one has to be
+   * possible — and deliberate, which is why it is a separate flag rather than the default.
+   */
+  regenerate = false,
 ): Promise<MediaAsset | ImageProblem> {
-  const existing = await findAsset(admin, input.contentItemId, input.contentVersion, slot);
+  const existing = regenerate ? null : await findAsset(admin, input.contentItemId, input.contentVersion, slot);
   if (existing) return existing;
 
-  const { data: brand } = await admin
-    .from("brands")
-    .select("visual_instructions")
-    .eq("organization_id", input.organizationId)
-    .limit(1)
-    .maybeSingle();
+  // The subject comes from what the campaign decided about this piece. Without it the prompt is
+  // style and prohibitions only, which is the empty brief that produced pictures unrelated to
+  // the content.
+  const [{ data: brand }, { data: item }] = await Promise.all([
+    admin.from("brands").select("visual_instructions").eq("organization_id", input.organizationId).limit(1).maybeSingle(),
+    admin
+      .from("content_items")
+      .select("content_concepts(pillar,angle,audience_persona)")
+      .eq("id", input.contentItemId)
+      .maybeSingle(),
+  ]);
 
-  const request = buildImageRequest(input.variant, slot, (brand as { visual_instructions: string | null } | null)?.visual_instructions ?? "");
+  const concept = (item?.content_concepts ?? null) as { pillar: string; angle: string; audience_persona: string } | null;
+  const request = buildImageRequest(input.variant, slot, {
+    pillar: concept?.pillar,
+    angle: concept?.angle,
+    audience: concept?.audience_persona,
+    brandVisualInstructions: (brand as { visual_instructions: string | null } | null)?.visual_instructions ?? "",
+  });
   if (!request) return { problem: "no_direction" };
 
   const provider = getImageProvider(process.env, isDemoMode);

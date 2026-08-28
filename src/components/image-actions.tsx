@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CircleAlert, ImageIcon, Loader2 } from "lucide-react";
+import { Check, CircleAlert, ImageIcon, Loader2, RefreshCw } from "lucide-react";
 
 // Generating the artwork for a piece, one frame at a time.
 //
@@ -34,14 +34,14 @@ export function ImageActions({ contentItemId, demo, frames, existing, compact = 
   const [message, setMessage] = useState<string | null>(null);
   const has = new Set(existing);
 
-  async function generate(slot: string) {
+  async function generate(slot: string, regenerate = false) {
     if (demo) { setMessage("En modo demo no se generan imágenes."); return; }
     setBusy(slot);
     setMessage(null);
     const response = await fetch(`/api/content/${contentItemId}/image`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slot, requestId: crypto.randomUUID() }),
+      body: JSON.stringify({ slot, requestId: crypto.randomUUID(), regenerate }),
     });
     const payload = await response.json().catch(() => null);
     setBusy(null);
@@ -91,7 +91,12 @@ export function ImageActions({ contentItemId, demo, frames, existing, compact = 
           <li key={frame.key} className={has.has(frame.key) ? "is-done" : ""}>
             <span className="image-slot-label">{frame.label}</span>
             {has.has(frame.key) ? (
-              <span className="voiceover-has"><Check size={13} /> Con imagen</span>
+              <span className="image-done">
+                <span className="voiceover-has"><Check size={13} /> Con imagen</span>
+                <button className="voiceover-quick" onClick={() => generate(frame.key, true)} disabled={busy !== null}>
+                  {busy === frame.key ? <><Loader2 size={12} className="spin" /> Rehaciendo…</> : <><RefreshCw size={12} /> Rehacer</>}
+                </button>
+              </span>
             ) : (
               <button className="voiceover-quick" onClick={() => generate(frame.key)} disabled={busy !== null}>
                 {busy === frame.key ? <><Loader2 size={12} className="spin" /> Generando…</> : <><ImageIcon size={12} /> Generar</>}
