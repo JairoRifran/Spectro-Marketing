@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Music2, Repeat2, Send, ThumbsUp, Volume2 } from "lucide-react";
 import type { PlatformContentVariant } from "@/server/content/schemas/variant";
 import type { MockAccount } from "@/features/content/account";
+import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
 
 // What the piece will look like where it lands.
 //
@@ -53,15 +54,34 @@ function Caption({ text, limit }: { text: string; limit: number }) {
  * The media rectangle. There is no picture to show, so it carries the direction that will be
  * handed to whatever produces one, plus any text meant to be burned into the frame.
  */
-function Media({ direction, onScreen, children }: { direction?: string; onScreen?: string[]; children?: ReactNode }) {
+function Media({ onScreen, children }: { onScreen?: string[]; children?: ReactNode }) {
   return (
     <div className="mock-media">
       {children}
       {onScreen && onScreen.length > 0 && (
         <div className="mock-onscreen">{onScreen.map((line, index) => <span key={index}>{line}</span>)}</div>
       )}
-      {direction && <p className="mock-direction"><b>Dirección visual</b>{direction}</p>}
+      <span className="mock-media-note" aria-hidden="true">Acá va la imagen</span>
     </div>
+  );
+}
+
+/** The brief for whoever makes the picture. A note about the frame, so it sits outside it. */
+function Direction({ text }: { text: string }) {
+  return <p className="mock-direction"><b>Dirección visual</b>{text}</p>;
+}
+
+/**
+ * Says which platform this is, in its own colour. Without it three cards side by side read as
+ * three copies of the same thing, which is exactly the opposite of the point.
+ */
+function PlatformTag({ variant }: { variant: PlatformContentVariant }) {
+  return (
+    <p className="mock-tag">
+      <span className="mock-tag-dot" aria-hidden="true" />
+      <strong>{PLATFORM_LABEL[variant.platform] ?? variant.platform}</strong>
+      <span>{FORMAT_LABEL[variant.format] ?? variant.format}</span>
+    </p>
   );
 }
 
@@ -182,7 +202,7 @@ function Carousel({ variant, account }: { variant: PlatformContentVariant; accou
         <div><strong>{account.handle}</strong><small>{account.name}</small></div>
         <MoreHorizontal size={16} aria-hidden="true" />
       </header>
-      <Media direction={current.visualNote}>
+      <Media>
         <span className="mock-slide-kind">{current.kind}</span>
         <h4 className="mock-slide-headline">{current.headline}</h4>
         {current.body && <p className="mock-slide-body">{current.body}</p>}
@@ -195,6 +215,7 @@ function Carousel({ variant, account }: { variant: PlatformContentVariant; accou
       </div>
       <div className="mock-actions" aria-hidden="true"><Heart size={19} /><MessageCircle size={19} /><Send size={19} /><Bookmark size={19} className="mock-actions-end" /></div>
       <Caption text={`${account.handle} ${carousel.caption}`} limit={125} />
+      <Direction text={current.visualNote} />
     </div>
   );
 }
@@ -210,11 +231,12 @@ function StaticPost({ variant, account }: { variant: PlatformContentVariant; acc
         <div><strong>{account.handle}</strong><small>{account.name}</small></div>
         <MoreHorizontal size={16} aria-hidden="true" />
       </header>
-      <Media direction={post.visualDirection} onScreen={post.onScreenText}>
+      <Media onScreen={post.onScreenText}>
         <h4 className="mock-slide-headline">{post.headline}</h4>
       </Media>
       <div className="mock-actions" aria-hidden="true"><Heart size={19} /><MessageCircle size={19} /><Send size={19} /><Bookmark size={19} className="mock-actions-end" /></div>
       <Caption text={`${account.handle} ${post.caption}`} limit={125} />
+      <Direction text={post.visualDirection} />
     </div>
   );
 }
@@ -247,6 +269,7 @@ export function PlatformMockup({ variant, account }: { variant: PlatformContentV
   const shape = variant.detail.shape;
   return (
     <div className={`platform-mockup on-${variant.platform} shape-${shape}`}>
+      <PlatformTag variant={variant} />
       {shape === "video" && <VerticalVideo variant={variant} account={account} />}
       {shape === "story" && <StorySequence variant={variant} account={account} />}
       {shape === "carousel" && <Carousel variant={variant} account={account} />}

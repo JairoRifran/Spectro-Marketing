@@ -1,26 +1,10 @@
 import type { PlatformContentVariant } from "@/server/content/schemas/variant";
+import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
 
 // Conceptual previews, one per production shape. The goal is reviewing a piece, not imitating
 // a proprietary interface: a reviewer needs to see the beats, the slides or the paragraphs, so
 // each shape is rendered as what it actually is. No raw JSON reaches the screen.
 
-const PLATFORM_LABEL: Record<string, string> = {
-  instagram: "Instagram",
-  facebook: "Facebook",
-  tiktok: "TikTok",
-  youtube_shorts: "YouTube Shorts",
-  linkedin: "LinkedIn",
-};
-
-const FORMAT_LABEL: Record<string, string> = {
-  reel: "Reel",
-  short_video: "Video corto",
-  carousel: "Carrusel",
-  story: "Stories",
-  static_post: "Post estático",
-  text_post: "Post de texto",
-  document_post: "Documento",
-};
 
 function Paragraphs({ text }: { text: string }) {
   const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);

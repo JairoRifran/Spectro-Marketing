@@ -179,18 +179,35 @@
 .preview-tablist button{padding:6px 13px;border:0;border-radius:7px;background:transparent;color:#68746f;font-size:10px;font-weight:650}
 .preview-tablist button.is-active{background:#fff;color:#1d3630;box-shadow:0 1px 3px rgba(20,38,37,.09)}
 
-.platform-mockup{display:grid;gap:12px}
+/* Each platform carries its own accent so three cards side by side are three platforms at a
+   glance, not three copies of one card. Colour and name only — no borrowed marks. */
+.platform-mockup,.gallery-card{--net:#4a5754;--net-soft:#eef1f0}
+.on-instagram{--net:#c13584;--net-soft:#fbecf5}
+.on-facebook{--net:#1877f2;--net-soft:#e8f1fe}
+.on-tiktok{--net:#111;--net-soft:#ececec}
+.on-youtube_shorts{--net:#d32f2f;--net-soft:#fdeceb}
+.on-linkedin{--net:#0a66c2;--net-soft:#e8f1fa}
+.platform-mockup{display:grid;gap:11px}
+
+.mock-tag{margin:0;display:flex;align-items:center;gap:7px;font-size:9px;color:#8b9592}
+.mock-tag-dot{width:7px;height:7px;border-radius:50%;background:var(--net)}
+.mock-tag strong{color:var(--net);font-size:10px;font-weight:750;letter-spacing:.02em}
+.mock-tag span:last-child{padding:2px 7px;border-radius:99px;background:var(--net-soft);color:#5b6764;font-size:9px;font-weight:600}
 .mock-disclaimer{margin:0;color:#8b9592;font-size:9px;line-height:1.5;max-width:640px}
-.mock-avatar{flex:none;width:26px;height:26px;display:inline-grid;place-items:center;border-radius:50%;background:#25403a;color:#fff;font-size:8px;font-weight:750;vertical-align:middle}
+.mock-avatar{flex:none;width:26px;height:26px;display:inline-grid;place-items:center;border-radius:50%;background:var(--net,#25403a);color:#fff;font-size:8px;font-weight:750;vertical-align:middle}
 
 /* Feed post: Instagram, Facebook, LinkedIn. */
-.mock-post{max-width:420px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.mock-post{max-width:420px;border:1px solid var(--line);border-top:2px solid var(--net);border-radius:12px;background:#fff;overflow:hidden}
 .mock-post-head{display:flex;align-items:center;gap:9px;padding:11px 13px}
 .mock-post-head>div{flex:1;min-width:0}
 .mock-post-head strong{display:block;font-size:11px;color:#1d3630}
 .mock-post-head small{display:block;color:#8b9592;font-size:9px}
 .mock-post-head svg{color:#8b9592}
-.mock-media{position:relative;padding:20px 18px;min-height:210px;display:flex;flex-direction:column;justify-content:center;gap:9px;background:linear-gradient(155deg,#eef3f1,#e1ebe7);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mock-media{position:relative;aspect-ratio:1/1;padding:34px 20px;display:flex;flex-direction:column;justify-content:center;gap:10px;background:
+  repeating-linear-gradient(135deg,rgba(255,255,255,.5) 0 9px,transparent 9px 18px),
+  linear-gradient(155deg,var(--net-soft),#eef2f0);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mock-media-note{position:absolute;left:0;right:0;bottom:11px;text-align:center;color:#93a09c;font-size:8px;letter-spacing:.12em;text-transform:uppercase}
 .mock-post.is-text .mock-media{display:none}
 .mock-slide-kind{position:absolute;top:11px;left:14px;color:#7c8a86;font-size:8px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}
 .mock-slide-count{position:absolute;top:10px;right:12px;padding:2px 8px;border-radius:99px;background:rgba(16,43,42,.72);color:#fff;font-size:9px;font-weight:650}
@@ -198,15 +215,16 @@
 .mock-slide-body{margin:0;color:#42524e;font-size:12px;line-height:1.5}
 .mock-onscreen{display:flex;flex-wrap:wrap;gap:5px}
 .mock-onscreen span{padding:3px 8px;border-radius:5px;background:rgba(16,43,42,.86);color:#fff;font-size:10px;font-weight:650}
-.mock-direction{margin:0;padding-top:9px;border-top:1px dashed #c6d4cf;color:#66736f;font-size:9px;line-height:1.5}
+.mock-direction{margin:0;padding:9px 13px 12px;color:#66736f;font-size:9px;line-height:1.5;background:#fafbfb;border-top:1px dashed #dbe3e0}
 .mock-direction b{display:block;margin-bottom:2px;color:#8b9592;font-size:8px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}
 .mock-dots{display:flex;justify-content:center;gap:5px;padding:9px 0 2px}
 .mock-dots button{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:#cfd8d5}
-.mock-dots button.is-active{background:#16a47a}
-.mock-actions{display:flex;align-items:center;gap:15px;padding:10px 13px 4px;color:#20302d}
+.mock-dots button.is-active{background:var(--net)}
+.mock-actions{display:flex;align-items:center;gap:15px;padding:10px 13px 4px;color:var(--net)}
 .mock-actions-end{margin-left:auto}
 .mock-actions.is-labelled{gap:0;justify-content:space-between;padding:9px 8px;border-top:1px solid var(--line);color:#66736f}
 .mock-actions.is-labelled span{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600}
+.mock-post.is-text .mock-post-head{border-top:0}
 .mock-caption{margin:0;padding:6px 13px 13px;color:#20302d;font-size:12px;line-height:1.5;white-space:pre-wrap}
 .mock-post.is-text .mock-caption{padding-top:2px}
 .mock-caption button{margin-left:5px;padding:0;border:0;background:transparent;color:#8b9592;font-size:12px}
@@ -215,15 +233,17 @@
 /* Vertical video: TikTok, Reels, Shorts, Stories. */
 .mock-vertical{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
 .mock-phone{flex:none;width:250px}
-.mock-frame{position:relative;aspect-ratio:9/16;padding:16px 46px 14px 14px;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(165deg,#1d3430,#0e1f1d);color:#fff;overflow:hidden}
+.mock-frame{position:relative;aspect-ratio:9/16;padding:16px 46px 14px 14px;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(168deg,#242628,#0d0e0f);color:#fff;overflow:hidden;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06)}
+.on-youtube_shorts .mock-frame{background:linear-gradient(168deg,#2b1618,#0f0b0b)}
+.on-instagram .mock-frame{background:linear-gradient(168deg,#2a1c27,#100b0f)}
 .mock-hook{margin:0;font-size:16px;font-weight:700;line-height:1.24;letter-spacing:-.02em;text-shadow:0 1px 8px rgba(0,0,0,.4)}
-.mock-scene-visual{margin:10px 0 0;color:#b6cbc5;font-size:10px;line-height:1.5}
-.mock-voiceover{margin:8px 0 0;display:flex;align-items:flex-start;gap:5px;color:#8fb3ab;font-size:9px;line-height:1.45}
+.mock-scene-visual{margin:10px 0 0;color:#b9bfc2;font-size:10px;line-height:1.5}
+.mock-voiceover{margin:8px 0 0;display:flex;align-items:flex-start;gap:5px;color:#9aa2a6;font-size:9px;line-height:1.45}
 .mock-rail{position:absolute;right:9px;bottom:96px;display:grid;gap:15px;color:#fff;opacity:.9}
 .mock-vertical-foot{margin-top:auto}
 .mock-handle{margin:0;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:650}
-.mock-vertical-caption{margin:6px 0 0;color:#dbe8e4;font-size:10px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.mock-sound{margin:7px 0 0;display:flex;align-items:center;gap:5px;color:#a9c4bd;font-size:9px}
+.mock-vertical-caption{margin:6px 0 0;color:#dfe3e5;font-size:10px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mock-sound{margin:7px 0 0;display:flex;align-items:center;gap:5px;color:#a7aeb1;font-size:9px}
 .mock-duration{margin:8px 0 0;text-align:center;color:#8b9592;font-size:9px}
 
 .mock-frame.is-story{padding-top:26px}
@@ -231,19 +251,19 @@
 .mock-segments span{flex:1;height:2px;border-radius:2px;background:rgba(255,255,255,.28)}
 .mock-segments span.is-seen{background:#fff}
 .mock-story-handle{margin-bottom:12px}
-.mock-story-role{margin:auto 0 0;color:#8fb3ab;font-size:9px;text-transform:uppercase;letter-spacing:.1em}
+.mock-story-role{margin:auto 0 0;color:#a7aeb1;font-size:9px;text-transform:uppercase;letter-spacing:.1em}
 .mock-story-nav{display:flex;justify-content:center;gap:5px;margin-top:9px}
 .mock-story-nav button{width:22px;height:22px;border:1px solid var(--line);border-radius:6px;background:#fff;color:#68746f;font-size:9px}
-.mock-story-nav button[aria-pressed="true"]{border-color:#16a47a;background:#e8f7f1;color:#12805f;font-weight:700}
+.mock-story-nav button[aria-pressed="true"]{border-color:var(--net);background:var(--net-soft);color:var(--net);font-weight:700}
 
 .mock-timeline{flex:1;min-width:230px}
 .mock-timeline-title{margin:0 0 8px;color:#8b9592;font-size:8px;font-weight:750;letter-spacing:.13em;text-transform:uppercase}
 .mock-timeline ol{margin:0;padding:0;list-style:none;display:grid;gap:4px}
 .mock-timeline button{width:100%;display:grid;grid-template-columns:20px 1fr auto;align-items:baseline;gap:9px;padding:7px 9px;border:1px solid transparent;border-radius:8px;background:#f7f9f8;text-align:left}
 .mock-timeline button:hover{background:#f0f4f2}
-.mock-timeline li.is-active button{border-color:#bfe0d1;background:#eefaf4}
+.mock-timeline li.is-active button{border-color:var(--net);background:var(--net-soft)}
 .mock-timeline button b{color:#8b9592;font-size:9px}
-.mock-timeline li.is-active button b{color:#12805f}
+.mock-timeline li.is-active button b{color:var(--net)}
 .mock-timeline button span{color:#3f4f4c;font-size:10px;line-height:1.45}
 .mock-timeline button time{color:#9aa5a2;font-size:9px}
 .mock-payoff{margin:9px 0 0;color:#3f4f4c;font-size:10px;line-height:1.5}
@@ -260,9 +280,9 @@
 .view-switch a.is-active{background:#fff;color:#1d3630;box-shadow:0 1px 3px rgba(20,38,37,.09)}
 
 .content-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:18px}
-.gallery-card{padding:16px;border:1px solid var(--line);border-radius:12px;background:#fbfcfc}
-.gallery-card>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:13px}
-.gallery-card>header a{color:#1d3630;font-size:12px;font-weight:650;text-decoration:none}
+.gallery-card{padding:16px;border:1px solid var(--line);border-top:3px solid var(--net);border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(20,38,37,.04)}
+.gallery-card>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef1f0}
+.gallery-card>header a{color:#1d3630;font-size:13px;font-weight:650;line-height:1.35;text-decoration:none}
 .gallery-card>header a:hover{text-decoration:underline}
 .gallery-card>header small{display:block;margin-top:3px;color:#8b9592;font-size:9px}
 @media(max-width:900px){.content-gallery{grid-template-columns:1fr}}

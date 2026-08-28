@@ -276,3 +276,26 @@ test("applying a filter does not throw you out of the simulation", async ({ page
   await expect(page.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
   await expect(page.locator("table")).toHaveCount(0);
 });
+
+// Three cards side by side used to read as three copies of one card: the platform was only tiny
+// grey text. Each simulation now names its platform and carries that platform's accent.
+test("every simulation names the platform it is headed for", async ({ page }) => {
+  await page.goto("/content?view=feed");
+
+  const instagram = page.locator(".platform-mockup.on-instagram");
+  await expect(instagram.locator(".mock-tag")).toContainText("Instagram");
+  await expect(instagram.locator(".mock-tag")).toContainText("Carrusel");
+
+  const tiktok = page.locator(".platform-mockup.on-tiktok");
+  await expect(tiktok.locator(".mock-tag")).toContainText("TikTok");
+  await expect(tiktok.locator(".mock-tag")).toContainText("Video corto");
+
+  // The accent is a real difference, not the same colour twice.
+  const colourOf = (selector: string) => page.locator(selector).evaluate((node) => getComputedStyle(node).getPropertyValue("--net").trim());
+  expect(await colourOf(".platform-mockup.on-instagram")).not.toBe(await colourOf(".platform-mockup.on-tiktok"));
+});
+
+test("the platform is named on the detail page simulation too", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  await expect(page.locator(".platform-mockup .mock-tag")).toContainText("TikTok");
+});

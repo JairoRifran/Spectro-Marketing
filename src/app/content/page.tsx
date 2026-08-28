@@ -98,11 +98,11 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
             {view === "feed" ? (
               <div className="content-gallery">
                 {data.items.map((item) => (
-                  <article key={item.id} className="gallery-card">
+                  <article key={item.id} className={`gallery-card on-${item.platform}`}>
                     <header>
                       <div>
                         <Link href={`/content/${item.id}`}>{item.title}</Link>
-                        <small>{PLATFORM_LABEL[item.platform] ?? item.platform} · {FORMAT_LABEL[item.format] ?? item.format} · v{item.currentVersion}</small>
+                        <small>v{item.currentVersion} · {item.pillar}</small>
                       </div>
                       <StatusPill value={item.status} />
                     </header>
