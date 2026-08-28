@@ -108,3 +108,35 @@ describe("campaign approval scoping", () => {
     expect(line).toContain('is("content_item_id",null)');
   });
 });
+
+// A piece the quality gate sent back has no open approval, so the decision route used to answer
+// 409 and the detail page rendered no actions at all: the piece was stuck with no way forward.
+// A rewrite is the one outcome that must stay reachable from those states.
+describe("revision reachability", () => {
+  const read = async (path: string) => {
+    const { readFileSync } = await import("node:fs");
+    return readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
+  };
+
+  it("only refuses a missing approval for outcomes that need one", async () => {
+    const source = await read("src/app/api/content/[id]/decision/route.ts");
+    expect(source).toContain('if (!approval && parsed.data.decision !== "revision")');
+    // The approval engine must still be the only path to approved/rejected.
+    expect(source).toContain("if (approval) {");
+    expect(source.indexOf("decide_approval")).toBeGreaterThan(source.indexOf("if (approval) {"));
+  });
+
+  it("offers the rewrite on the states where the piece is stuck", async () => {
+    const source = await read("src/app/content/[id]/page.tsx");
+    expect(source).toContain('const revisable = ["needs_revision", "rejected"].includes(item.status)');
+    expect(source).toContain("pendingDecision || revisable");
+    // Approve and reject stay tied to a real pending decision.
+    expect(source).toContain('item.status === "waiting_approval" && Boolean(data.approval');
+  });
+
+  it("hides approve and reject when there is no decision to make", async () => {
+    const source = await read("src/components/content-actions.tsx");
+    expect(source).toContain("{!revisionOnly && <button");
+    expect(source.match(/\{!revisionOnly && <button/g)!.length).toBe(2);
+  });
+});

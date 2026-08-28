@@ -30,7 +30,10 @@ export default async function ContentDetailPage({ params, searchParams }: { para
   const quality = data.quality;
   const variant = data.variant;
   const review = data.review as Record<string, unknown> | null;
-  const canDecide = data.role !== "viewer" && item.status === "waiting_approval" && Boolean(data.approval && data.approval.status === "requested");
+  const pendingDecision = item.status === "waiting_approval" && Boolean(data.approval && data.approval.status === "requested");
+  // A blocked or rejected piece can still be rewritten; that is the only way out of those states.
+  const revisable = ["needs_revision", "rejected"].includes(item.status);
+  const canDecide = data.role !== "viewer" && (pendingDecision || revisable);
 
   return (
     <DashboardShell activePath="/content" organizationName={data.orgName} demo={data.mode === "demo"}>
@@ -159,12 +162,12 @@ export default async function ContentDetailPage({ params, searchParams }: { para
 
           <section className="detail-panel wide">
             <span className="section-kicker">CONTROL HUMANO</span>
-            <h3>{item.status === "waiting_approval" ? "Esperando tu decisión" : "Decisión registrada"}</h3>
+            <h3>{pendingDecision ? "Esperando tu decisión" : revisable ? "Necesita una nueva versión" : "Decisión registrada"}</h3>
             {item.status === "waiting_approval"
               ? <p>Aprobar no publica, no agenda ni gasta presupuesto. Sólo marca la pieza como aprobada editorialmente.</p>
               : <p>Estado actual: {item.status.replace(/_/g, " ")}. {data.approval?.decision_note ? "Feedback registrado abajo." : ""}</p>}
             {data.approval?.decision_note && <blockquote>{data.approval.decision_note}</blockquote>}
-            {item.status === "waiting_approval" && <ContentActions id={id} demo={data.mode === "demo"} canDecide={canDecide} />}
+            {(pendingDecision || revisable) && <ContentActions id={id} demo={data.mode === "demo"} canDecide={canDecide} revisionOnly={!pendingDecision} />}
           </section>
 
           <section className="detail-panel wide">

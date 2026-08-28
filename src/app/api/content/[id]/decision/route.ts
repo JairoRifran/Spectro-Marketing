@@ -37,16 +37,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .eq("status", "requested")
     .order("created_at", { ascending: false })
     .maybeSingle();
-  if (!approval) return Response.json({ error: "no_open_approval" }, { status: 409 });
+  // A piece the quality gate sent back has no open approval, but it is exactly the piece that
+  // most needs a rewrite. Approving or rejecting still requires a pending decision to act on;
+  // asking for a revision does not.
+  if (!approval && parsed.data.decision !== "revision") {
+    return Response.json({ error: "no_open_approval" }, { status: 409 });
+  }
 
-  const decision = parsed.data.decision === "approve" ? "approved" : "rejected";
-  const note = parsed.data.feedback ?? null;
-
-  const { error } = await context.db.rpc("decide_approval", { p_approval_id: approval.id, p_status: decision, p_note: note });
-  if (error) return Response.json({ error: "decision_failed" }, { status: 403 });
-
-  if (parsed.data.decision !== "revision") {
-    return Response.json({ id, decision: parsed.data.decision, status: decision });
+  if (approval) {
+    const decision = parsed.data.decision === "approve" ? "approved" : "rejected";
+    const { error } = await context.db.rpc("decide_approval", { p_approval_id: approval.id, p_status: decision, p_note: parsed.data.feedback ?? null });
+    if (error) return Response.json({ error: "decision_failed" }, { status: 403 });
+    if (parsed.data.decision !== "revision") {
+      return Response.json({ id, decision: parsed.data.decision, status: decision });
+    }
   }
 
   try {

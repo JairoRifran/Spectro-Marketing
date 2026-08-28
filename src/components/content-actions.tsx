@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 // The three human outcomes. A revision cannot be sent without feedback, because the feedback is
 // what the next version has to answer — an empty revision would just reproduce the same draft.
 
-export function ContentActions({ id, demo, canDecide }: { id: string; demo: boolean; canDecide: boolean }) {
+export function ContentActions({ id, demo, canDecide, revisionOnly = false }: { id: string; demo: boolean; canDecide: boolean; revisionOnly?: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "working" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -37,9 +37,11 @@ export function ContentActions({ id, demo, canDecide }: { id: string; demo: bool
   return (
     <div className="content-actions">
       <div className="content-action-row">
-        <button className="primary-button" onClick={() => send("approve")} disabled={state === "working"}>Aprobar</button>
-        <button className="secondary-button" onClick={() => setRevising((open) => !open)} disabled={state === "working"} aria-expanded={revising}>Pedir revisión</button>
-        <button className="secondary-button danger" onClick={() => send("reject")} disabled={state === "working"}>Rechazar</button>
+        {!revisionOnly && <button className="primary-button" onClick={() => send("approve")} disabled={state === "working"}>Aprobar</button>}
+        <button className={revisionOnly ? "primary-button" : "secondary-button"} onClick={() => setRevising((open) => !open)} disabled={state === "working"} aria-expanded={revising}>
+          {revisionOnly ? "Reescribir esta pieza" : "Pedir revisión"}
+        </button>
+        {!revisionOnly && <button className="secondary-button danger" onClick={() => send("reject")} disabled={state === "working"}>Rechazar</button>}
       </div>
       {revising && (
         <div className="content-revision">
