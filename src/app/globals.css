@@ -261,9 +261,10 @@
 .mock-timeline ol{margin:0;padding:0;list-style:none;display:grid;gap:4px}
 .mock-timeline button{width:100%;display:grid;grid-template-columns:20px 1fr auto;align-items:baseline;gap:9px;padding:7px 9px;border:1px solid transparent;border-radius:8px;background:#f7f9f8;text-align:left}
 .mock-timeline button:hover{background:#f0f4f2}
-.mock-timeline li.is-active button{border-color:var(--net);background:var(--net-soft)}
+.mock-timeline li.is-active button{border-color:#cfd8d5;background:#f0f3f2}
 .mock-timeline button b{color:#8b9592;font-size:9px}
-.mock-timeline li.is-active button b{color:var(--net)}
+.mock-timeline li.is-active button b{color:#233c37}
+.mock-timeline li.is-active button{box-shadow:inset 3px 0 var(--net)}
 .mock-timeline button span{color:#3f4f4c;font-size:10px;line-height:1.45}
 .mock-timeline button time{color:#9aa5a2;font-size:9px}
 .mock-payoff{margin:9px 0 0;color:#3f4f4c;font-size:10px;line-height:1.5}
@@ -288,8 +289,8 @@
 @media(max-width:900px){.content-gallery{grid-template-columns:1fr}}
 
 /* A composed frame is the picture itself, so it fills its container and the chrome sits over it. */
-.mock-media.is-composed{padding:0;background:none;display:block;position:relative}
-.mock-media.is-composed svg{display:block;width:100%;height:100%}
+.mock-media.is-composed{padding:0;background:none;display:block;position:relative;aspect-ratio:auto}
+.mock-media.is-composed svg{display:block;width:100%;height:auto}
 .mock-media-warn{position:absolute;left:10px;bottom:10px;padding:3px 8px;border-radius:5px;background:#8a5a17;color:#fff;font-size:9px;font-weight:650}
 .mock-frame.has-art{padding:0}
 .mock-frame-art{position:absolute;inset:0}
@@ -369,3 +370,10 @@
 .assembled-caption{margin:0;color:#66736f;font-size:10px}
 .gallery-assembled{margin-top:12px}
 .gallery-assembled summary{color:#8b9592;font-size:9px;cursor:pointer;margin-bottom:9px}
+
+.gallery-assembled{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #eef1f0}
+.voiceover-compact{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:9px}
+.voiceover-has{display:flex;align-items:center;gap:5px;color:#12805f;font-size:10px;font-weight:600}
+.voiceover-missing{display:flex;align-items:center;gap:5px;color:#8a5a17;font-size:10px;font-weight:600}
+.voiceover-quick{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#33433f;font-size:9px;font-weight:650}
+.voiceover-quick:disabled{opacity:.6}

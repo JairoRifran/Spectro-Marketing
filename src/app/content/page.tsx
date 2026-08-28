@@ -9,6 +9,10 @@ import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { AssembledPreview } from "@/components/assembled-preview";
 import { intendedTimings } from "@/server/media/timing";
+import { buildNarration } from "@/server/media/narration";
+import { VoiceoverAction } from "@/components/voiceover-action";
+import { estimateCost, ratesFromEnv } from "@/server/spend/pricing";
+import { formatMoney } from "@/server/spend/money";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
 import { CONTENT_FORMATS } from "@/server/content/platforms";
 
@@ -111,24 +115,40 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       <StatusPill value={item.status} />
                     </header>
                     {item.variant ? (() => {
-                      const frames = composeFrames(item.variant!);
+                      const variant = item.variant;
+                      const frames = composeFrames(variant);
+                      const narration = buildNarration(variant);
+                      const playable = frames.length > 1;
                       return (
                         <>
-                          <PlatformMockup variant={item.variant!} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} />
-                          {/* Silent here on purpose: signing an audio link for every card would
-                              be one storage round trip per piece just to open the list. The
-                              detail view plays it with the voice. */}
-                          {frames.length > 1 && (
-                            <details className="gallery-assembled">
-                              <summary>Ver ensamblado</summary>
+                          {/* Anything with a sequence opens ready to play. Hiding it behind a
+                              disclosure meant the pieces that move looked exactly like the ones
+                              that do not. */}
+                          {playable && (
+                            <div className="gallery-assembled">
                               <AssembledPreview
                                 frames={frames}
-                                timings={intendedTimings(item.variant!, frames)}
+                                timings={intendedTimings(variant, frames)}
                                 identity={SPECTRO_IDENTITY}
+                                audioUrl={item.audioUrl}
                                 label={item.title}
                               />
-                            </details>
+                              {narration && (
+                                <VoiceoverAction
+                                  contentItemId={item.id}
+                                  demo={data.mode === "demo"}
+                                  compact
+                                  preflight={{
+                                    hasNarration: true,
+                                    characters: [...narration.text].length,
+                                    estimate: formatMoney(estimateCost({ operation: "media.tts", text: narration.text }, ratesFromEnv(process.env))),
+                                    existing: item.audioUrl ? { durationSeconds: null, generatedBy: "provider", url: item.audioUrl } : null,
+                                  }}
+                                />
+                              )}
+                            </div>
                           )}
+                          <PlatformMockup variant={variant} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={item.audioUrl ? { url: item.audioUrl, mimeType: "audio/mpeg" } : null} />
                         </>
                       );
                     })() : <p className="panel-empty">Planificada, todavía sin escribir.</p>}

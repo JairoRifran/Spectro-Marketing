@@ -444,11 +444,19 @@ test("playing advances the sequence and the play control becomes pause", async (
   await expect(assembled).not.toContainText("0.0s /");
 });
 
-test("the gallery offers the sequence without fetching audio for every card", async ({ page }) => {
+test("a playable piece opens ready to play, not behind a disclosure", async ({ page }) => {
   await page.goto("/content?view=feed");
-  // Collapsed and silent: signing a link per card would be a storage round trip per piece just
-  // to open the list.
-  const details = page.locator(".gallery-assembled").first();
-  await expect(details.locator("summary")).toHaveText("Ver ensamblado");
-  await expect(details.locator("audio")).toHaveCount(0);
+  // Hidden behind a summary, the pieces that move looked exactly like the ones that do not.
+  const assembled = page.locator(".gallery-assembled .assembled").first();
+  await expect(assembled).toBeVisible();
+  await expect(assembled.getByRole("button", { name: "Reproducir" })).toBeVisible();
+  await expect(page.locator(".gallery-assembled summary")).toHaveCount(0);
+});
+
+test("a piece without a voice says so, and offers to make one with its cost", async ({ page }) => {
+  await page.goto("/content?view=feed&platform=tiktok");
+  const state = page.locator(".voiceover-compact").first();
+  await expect(state).toContainText("Sin voz en off");
+  // The price is on the button: nothing here spends without saying what it spends.
+  await expect(state.getByRole("button", { name: /Generar ·/ })).toBeVisible();
 });

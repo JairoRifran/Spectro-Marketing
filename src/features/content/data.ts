@@ -256,7 +256,11 @@ export async function getContentOperationalCounts() {
   };
 }
 
-export type GalleryItem = ContentListItem & { variant: PlatformContentVariant | null };
+export type GalleryItem = ContentListItem & {
+  variant: PlatformContentVariant | null;
+  /** A short-lived link to the produced voiceover, when there is one. */
+  audioUrl: string | null;
+};
 
 /**
  * The list, plus the written version of each piece, so the gallery can render every one inside
@@ -270,17 +274,28 @@ export async function getContentGallery(filters: ContentFilters): Promise<Omit<A
   if (list.items.length === 0) return { ...list, items: [] };
 
   if (list.mode === "demo") {
-    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null })) };
+    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null, audioUrl: null })) };
   }
 
   const ctx = await getOrganizationContext();
-  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null })) };
+  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null, audioUrl: null })) };
 
-  const { data } = await ctx.db
-    .from("content_variants")
-    .select("content_item_id,version,payload")
-    .eq("organization_id", ctx.orgId)
-    .in("content_item_id", list.items.map((item) => item.id));
+  const ids = list.items.map((item) => item.id);
+  const [{ data }, assets] = await Promise.all([
+    ctx.db.from("content_variants").select("content_item_id,version,payload").eq("organization_id", ctx.orgId).in("content_item_id", ids),
+    ctx.db.from("content_assets").select("content_item_id,content_version,storage_path").eq("organization_id", ctx.orgId).eq("slot", "voiceover").in("content_item_id", ids),
+  ]);
+
+  // One signing call for the whole page. Signing per card would be a storage round trip per
+  // piece, which is what kept the sequence collapsed and silent until now.
+  const assetRows = (assets.data ?? []) as Array<{ content_item_id: string; content_version: number; storage_path: string }>;
+  const signedByPath = new Map<string, string>();
+  if (assetRows.length > 0) {
+    const signed = await ctx.db.storage.from("content-assets").createSignedUrls(assetRows.map((row) => row.storage_path), 3600);
+    for (const entry of signed.data ?? []) {
+      if (entry.path && entry.signedUrl) signedByPath.set(entry.path, entry.signedUrl);
+    }
+  }
 
   const rows = (data ?? []) as Array<{ content_item_id: string; version: number; payload: unknown }>;
   const items = list.items.map((item) => {
@@ -288,7 +303,12 @@ export async function getContentGallery(filters: ContentFilters): Promise<Omit<A
     // The version the item currently points at; if that row is missing, the newest one written.
     const chosen = forItem.find((row) => row.version === item.currentVersion)
       ?? [...forItem].sort((a, b) => b.version - a.version)[0];
-    return { ...item, variant: (chosen?.payload as PlatformContentVariant | undefined) ?? null };
+    const asset = assetRows.find((row) => row.content_item_id === item.id && row.content_version === item.currentVersion);
+    return {
+      ...item,
+      variant: (chosen?.payload as PlatformContentVariant | undefined) ?? null,
+      audioUrl: asset ? signedByPath.get(asset.storage_path) ?? null : null,
+    };
   });
 
   return { ...list, items };

@@ -16,11 +16,13 @@ const PROBLEM_MESSAGE: Record<string, string> = {
   no_profile: "Todavía no elegiste cómo quiere que la lean tu marca. Configurá tono y región en Configuración → Voz.",
 };
 
-export function VoiceoverAction({ contentItemId, demo, preflight }: {
+export function VoiceoverAction({ contentItemId, demo, preflight, compact = false }: {
   contentItemId: string;
   demo: boolean;
   /** Worked out on the server, so there is no loading state and no second opinion about cost. */
   preflight: VoiceoverPreflight;
+  /** The gallery form: same decision, less furniture. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "working" | "done">("idle");
@@ -50,6 +52,26 @@ export function VoiceoverAction({ contentItemId, demo, preflight }: {
 
   if (!preflight.hasNarration) {
     return <p className="voiceover-none">Esta pieza no lleva voz en off.</p>;
+  }
+
+  if (compact) {
+    // In a list, the useful distinction is only "has a voice" or "does not", and what the
+    // missing one would cost. Everything else belongs on the piece's own page.
+    return (
+      <div className="voiceover-compact">
+        {preflight.existing ? (
+          <span className="voiceover-has"><AudioLines size={13} /> Con voz en off</span>
+        ) : (
+          <>
+            <span className="voiceover-missing"><CircleAlert size={13} /> Sin voz en off</span>
+            <button className="voiceover-quick" onClick={produce} disabled={state === "working"}>
+              {state === "working" ? "Generando…" : `Generar · ${preflight.estimate}`}
+            </button>
+          </>
+        )}
+        {message && <small className="form-error">{message}</small>}
+      </div>
+    );
   }
 
   return (
