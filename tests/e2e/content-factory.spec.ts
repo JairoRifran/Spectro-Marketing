@@ -97,8 +97,10 @@ test("the pipeline shows who is working and on what, without inventing activity"
   await expect(pipeline).toBeVisible();
   await expect(pipeline.getByText("Tu equipo está trabajando ahora")).toBeVisible();
 
-  // Clara is mid-task, so the "right now" band names the real task rather than a generic label.
-  await expect(pipeline.locator(".pipeline-now").getByText("Escribir tiktok: Proceso antes que herramienta")).toBeVisible();
+  // The panel opens on whoever holds the work and names the real task, not a generic label.
+  const explain = pipeline.locator(".pipeline-explain");
+  await expect(explain).toContainText("Clara");
+  await expect(explain).toContainText("Escribir tiktok: Proceso antes que herramienta");
 
   // Emilia has nothing queued in the fixture and must say so, not show a fabricated state.
   const emilia = pipeline.locator(".pipeline-stage", { hasText: "Emilia" });
@@ -144,9 +146,7 @@ test("Marketing HQ opens on where the work actually is", async ({ page }) => {
   await expect(pipeline).toBeVisible();
   await expect(pipeline.getByText("PIPELINE DEL EQUIPO")).toBeVisible();
   // Not a generic label: the real task title of the agent that currently holds the work.
-  const now = pipeline.locator(".pipeline-now");
-  await expect(now.getByText(/Escribir tiktok: Proceso antes que herramienta/)).toBeVisible();
-  await expect(now.getByText(/1 pieza espera tu decisión/)).toBeVisible();
+  await expect(pipeline.locator(".pipeline-explain")).toContainText("Escribir tiktok: Proceso antes que herramienta");
 });
 
 // Motion has to mean one specific thing. A pulsing green node and a flowing link mean an agent
@@ -162,5 +162,34 @@ test("only a stage an agent is genuinely working is animated", async ({ page }) 
 
   // The pending human decision is present, but as waiting rather than as work in flight.
   await expect(pipeline.locator(".pipeline-stage.is-waiting")).toHaveCount(1);
-  await expect(pipeline.locator(".pipeline-now li.is-human")).toHaveCount(1);
+});
+
+// The explanation is the point of the rail: a count says how many, never what or why.
+test("the panel explains what an agent is for and what they actually delivered", async ({ page }) => {
+  await page.goto("/");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  const explain = pipeline.locator(".pipeline-explain");
+
+  // It opens on the work without being asked.
+  await expect(explain).toContainText("Clara");
+  await expect(explain).toContainText(/AHORA MISMO|Ahora mismo/i);
+
+  // Picking someone else explains them instead, including what they last produced.
+  await pipeline.locator(".pipeline-stage", { hasText: "Mateo" }).getByRole("button").click();
+  await expect(explain).toContainText("Mateo");
+  await expect(explain).toContainText(/mercado/i);
+  await expect(explain).toContainText("Investigar oportunidad");
+
+  // And it can be handed back to the work.
+  await explain.getByRole("button", { name: "seguir el trabajo" }).click();
+  await expect(explain).toContainText("Clara");
+});
+
+test("a stage that never ran says so instead of inventing a delivery", async ({ page }) => {
+  await page.goto("/");
+  const pipeline = page.getByRole("region", { name: "Estado del trabajo de los agentes" });
+  await pipeline.locator(".pipeline-stage", { hasText: "Emilia" }).getByRole("button").click();
+  const explain = pipeline.locator(".pipeline-explain");
+  await expect(explain).toContainText("Emilia");
+  await expect(explain).toContainText("Todavía no le tocó trabajar en esto.");
 });

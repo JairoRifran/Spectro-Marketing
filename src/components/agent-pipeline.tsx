@@ -1,14 +1,13 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PipelineSnapshot, PipelineStage, StageStatus } from "@/server/content-factory/pipeline";
 
 // Live view of where the work is and who has it.
 //
-// Built as a rail of people rather than a diagram of boxes. The first version drew nine
-// identical discs, so a finished pipeline read as nine anonymous ticks and the counts floated
-// with no unit — "16" of what? Here every stage is the agent who does it, with their own colour
-// and their state written out, because "Clara · 16 piezas escritas" is understood at a glance
-// and a green circle is not.
+// Built as a rail of people rather than a diagram of boxes. Counts alone never explained
+// anything — "16" of what, and 16 of them doing what? — so every stage is the agent who does it
+// and the rail is paired with a panel that says, in words, what that agent is for and what they
+// actually produced. The panel follows the work on its own and can be pinned to anyone.
 //
 // Every state comes from a real task row. A stage pulses only while an agent genuinely holds
 // work; waiting on a person is drawn differently, because at that point the system is doing
@@ -56,30 +55,58 @@ function stateLine(stage: PipelineStage, visual: VisualState) {
   return "Sin trabajo";
 }
 
-function Stage({ stage }: { stage: PipelineStage }) {
+/**
+ * The dynamic half of the explanation: what this agent is on, or the last thing they actually
+ * delivered. Never a placeholder — if there is no real task title, it says so.
+ */
+function activityLine(stage: PipelineStage, visual: VisualState) {
+  if (visual === "working") return { kicker: "Ahora mismo", text: stage.currentTitle ?? stage.workingLabel };
+  if (visual === "waiting") return { kicker: "Te toca a vos", text: stage.currentTitle ?? "Hay piezas esperando tu decisión." };
+  if (stage.lastTitle) return { kicker: "Lo último que entregó", text: stage.lastTitle };
+  return { kicker: "Sin actividad", text: "Todavía no le tocó trabajar en esto." };
+}
+
+/** Where the eye should land: the work, then the decision, then whatever moved last. */
+function focusKeyOf(snapshot: PipelineSnapshot) {
+  const stages = snapshot.stages;
+  const working = stages.find((stage) => visualStateOf(stage) === "working");
+  const waiting = stages.find((stage) => visualStateOf(stage) === "waiting");
+  const done = [...stages].reverse().find((stage) => stage.status === "done");
+  return (working ?? waiting ?? done ?? stages[0])?.key ?? null;
+}
+
+function Stage({ stage, selected, onSelect }: { stage: PipelineStage; selected: boolean; onSelect: () => void }) {
   const visual = visualStateOf(stage);
   return (
-    <li className={`pipeline-stage is-${visual} tone-${TONE[stage.agentRole] ?? "slate"}`}>
-      <span className="pipeline-face" aria-hidden="true">
-        {initials(stage.agentName)}
-        {visual === "done" && <b className="pipeline-face-tick">✓</b>}
-      </span>
-      <strong className="pipeline-who">{stage.agentName}</strong>
-      <span className="pipeline-does">{stage.label}</span>
-      <span className="pipeline-state">{stateLine(stage, visual)}</span>
-      {stage.failed > 0 && (
-        <span className="pipeline-broke">{plural(stage.failed, "falló", "fallaron")}</span>
-      )}
+    <li className={`pipeline-stage is-${visual} tone-${TONE[stage.agentRole] ?? "slate"}${selected ? " is-selected" : ""}`}>
+      <button type="button" onClick={onSelect} aria-pressed={selected}>
+        <span className="pipeline-face" aria-hidden="true">
+          {initials(stage.agentName)}
+          {visual === "done" && <b className="pipeline-face-tick">✓</b>}
+        </span>
+        <strong className="pipeline-who">{stage.agentName}</strong>
+        <span className="pipeline-does">{stage.label}</span>
+        <span className="pipeline-state">{stateLine(stage, visual)}</span>
+        {stage.failed > 0 && <span className="pipeline-broke">{plural(stage.failed, "falló", "fallaron")}</span>}
+      </button>
     </li>
   );
 }
 
-function Phase({ title, caption, stages }: { title: string; caption: string; stages: PipelineStage[] }) {
+function Phase({ title, caption, stages, selectedKey, onSelect }: {
+  title: string;
+  caption: string;
+  stages: PipelineStage[];
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+}) {
   return (
     <div className="pipeline-phase-block">
       <p className="pipeline-phase-title"><b>{title}</b> {caption}</p>
       <ol className="pipeline-rail">
-        {stages.map((stage) => <Stage key={stage.key} stage={stage} />)}
+        {stages.map((stage) => (
+          <Stage key={stage.key} stage={stage} selected={stage.key === selectedKey} onSelect={() => onSelect(stage.key)} />
+        ))}
       </ol>
     </div>
   );
@@ -96,6 +123,8 @@ function headline(snapshot: PipelineSnapshot, waiting: boolean) {
 export function AgentPipeline({ campaignId, initial }: { campaignId?: string | null; initial: PipelineSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
   const [stale, setStale] = useState(false);
+  // Null means "follow the work". Clicking an agent pins the panel to them until they unpin it.
+  const [pinned, setPinned] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endpoint = campaignId ? `/api/campaigns/${campaignId}/pipeline` : "/api/pipeline";
 
@@ -135,8 +164,13 @@ export function AgentPipeline({ campaignId, initial }: { campaignId?: string | n
 
   const strategy = snapshot.stages.filter((stage) => stage.phase === "strategy");
   const content = snapshot.stages.filter((stage) => stage.phase === "content");
-  const busyStages = snapshot.stages.filter((stage) => visualStateOf(stage) === "working");
   const waitingStages = snapshot.stages.filter((stage) => visualStateOf(stage) === "waiting");
+
+  const focusKey = useMemo(() => focusKeyOf(snapshot), [snapshot]);
+  const selectedKey = pinned ?? focusKey;
+  const selected = snapshot.stages.find((stage) => stage.key === selectedKey) ?? snapshot.stages[0];
+  const selectedVisual = selected ? visualStateOf(selected) : "idle";
+  const activity = selected ? activityLine(selected, selectedVisual) : null;
 
   return (
     <section className={`agent-pipeline${snapshot.busy ? " is-busy" : ""}`} aria-label="Estado del trabajo de los agentes">
@@ -153,23 +187,24 @@ export function AgentPipeline({ campaignId, initial }: { campaignId?: string | n
         </p>
       </header>
 
-      {/* What is happening in full words. The rail has room for a state, not for a task title. */}
-      {(busyStages.length > 0 || waitingStages.length > 0) && (
-        <ul className="pipeline-now">
-          {[...busyStages, ...waitingStages].map((stage) => (
-            <li key={stage.key} className={stage.taskType ? "is-agent" : "is-human"}>
-              <span className="pipeline-now-avatar">{initials(stage.agentName)}</span>
-              <div>
-                <strong>{stage.agentName}</strong>
-                <p>{stage.currentTitle ?? stage.workingLabel}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Phase title="Estrategia" caption="deciden qué vale la pena hacer" stages={strategy} selectedKey={selectedKey} onSelect={setPinned} />
+      <Phase title="Contenido" caption="lo convierten en piezas y te lo traen" stages={content} selectedKey={selectedKey} onSelect={setPinned} />
 
-      <Phase title="Estrategia" caption="deciden qué vale la pena hacer" stages={strategy} />
-      <Phase title="Contenido" caption="lo convierten en piezas y te lo traen" stages={content} />
+      {/* The explanation. Half of it is what the role is for, which never changes; the other half
+          is what that agent actually did, which comes from the task rows and moves with them. */}
+      {selected && activity && (
+        <div className={`pipeline-explain is-${selectedVisual} tone-${TONE[selected.agentRole] ?? "slate"}`} aria-live="polite">
+          <span className="pipeline-explain-face" aria-hidden="true">{initials(selected.agentName)}</span>
+          <div>
+            <p className="pipeline-explain-who">
+              <strong>{selected.agentName}</strong> · {selected.label}
+              {pinned && <button type="button" className="pipeline-unpin" onClick={() => setPinned(null)}>seguir el trabajo</button>}
+            </p>
+            <p className="pipeline-explain-role">{selected.description}</p>
+            <p className="pipeline-explain-now"><b>{activity.kicker}:</b> {activity.text}</p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

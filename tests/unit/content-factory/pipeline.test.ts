@@ -140,3 +140,45 @@ describe("revision reachability", () => {
     expect(source.match(/\{!revisionOnly && <button/g)!.length).toBe(2);
   });
 });
+
+// Counts alone never explained anything. A stage has to be able to say what it is for and what
+// it actually delivered, and both have to come from something real.
+describe("stage explanations", () => {
+  it("gives every stage a description written for a person, not a task type", () => {
+    for (const stage of PIPELINE_STAGES) {
+      expect(stage.description.length).toBeGreaterThan(30);
+      expect(stage.description).toMatch(/\.$/);
+      // No internal vocabulary leaking into the thing a user reads.
+      expect(stage.description).not.toMatch(/content\.|campaign\.|task|payload|schema/i);
+    }
+  });
+
+  it("reports the most recent real task title, not the first row it finds", () => {
+    const stage = find([
+      { type: "content.copy", status: "completed", title: "Escribir instagram", updatedAt: "2026-08-27T10:00:00.000Z" },
+      { type: "content.copy", status: "completed", title: "Escribir linkedin", updatedAt: "2026-08-27T12:00:00.000Z" },
+      { type: "content.copy", status: "completed", title: "Escribir tiktok", updatedAt: "2026-08-27T11:00:00.000Z" },
+    ], "copy");
+    expect(stage.lastTitle).toBe("Escribir linkedin");
+  });
+
+  it("has nothing to report for a stage that never ran", () => {
+    expect(find([], "copy").lastTitle).toBeNull();
+    expect(find([], "human", 2).lastTitle).toBeNull();
+  });
+
+  it("still reports what was delivered even when the stage has gone quiet", () => {
+    const stage = find([{ type: "content.copy", status: "completed", title: "Escribir linkedin", updatedAt: "2026-08-27T12:00:00.000Z" }], "copy");
+    expect(stage.status).toBe("done");
+    expect(stage.currentTitle).toBeNull();
+    expect(stage.lastTitle).toBe("Escribir linkedin");
+  });
+
+  it("orders rows without a timestamp last instead of crashing on them", () => {
+    const stage = find([
+      { type: "content.copy", status: "completed", title: "Sin fecha" },
+      { type: "content.copy", status: "completed", title: "Con fecha", updatedAt: "2026-08-27T09:00:00.000Z" },
+    ], "copy");
+    expect(stage.lastTitle).toBe("Con fecha");
+  });
+});
