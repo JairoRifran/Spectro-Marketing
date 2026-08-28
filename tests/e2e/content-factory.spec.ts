@@ -265,3 +265,14 @@ test("the filter bar actually filters", async ({ page }) => {
   await expect(page.locator("tbody")).toContainText("TikTok");
   await expect(page.locator("tbody")).not.toContainText("Instagram");
 });
+
+// The filter bar is a GET form. Without the view travelling with it, applying a filter from the
+// simulation silently dropped you back into the table.
+test("applying a filter does not throw you out of the simulation", async ({ page }) => {
+  await page.goto("/content?view=feed");
+  await page.locator("select[name='platform']").selectOption("tiktok");
+  await page.getByRole("button", { name: "Aplicar" }).click();
+  await expect(page).toHaveURL(/view=feed/);
+  await expect(page.locator(".platform-mockup.on-tiktok")).toHaveCount(1);
+  await expect(page.locator("table")).toHaveCount(0);
+});

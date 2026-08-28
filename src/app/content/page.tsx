@@ -51,6 +51,9 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         }
       >
         <FilterBar>
+          {/* The filter form is a GET submit, so the active view has to travel with it or
+              applying a filter silently throws you back to the table. */}
+          {view === "feed" && <input type="hidden" name="view" value="feed" />}
           <select name="campaign" defaultValue={filters.campaign} aria-label="Filtrar por campaña">
             <option value="">Todas las campañas</option>
             {data.campaigns.map((campaign) => campaign && <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
