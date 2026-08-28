@@ -1,5 +1,6 @@
 import { getOrganizationContext } from "@/features/organizations/context";
 import { getMediaProvider } from "@/server/media/providers";
+import { MockMediaProvider } from "@/server/media/mock-provider";
 import { resolveBrandVoice } from "@/server/media/brand-voice";
 import { voiceProfileSchema, type VoiceProfile } from "@/server/media/voice-profile";
 import type { AvailableVoice } from "@/server/media/provider";
@@ -99,7 +100,14 @@ export async function getVoiceSettings(): Promise<VoiceSettingsData | null> {
   };
 }
 
-function demoVoiceSettings(): VoiceSettingsData {
+/**
+ * Demo reads its catalogue from the mock provider rather than restating it.
+ *
+ * Two hand-written lists of the same voices drift the moment one of them gains a field, and the
+ * screen then passes its tests against a fixture that no longer resembles what the provider
+ * returns.
+ */
+async function demoVoiceSettings(): Promise<VoiceSettingsData> {
   const profile = voiceProfileSchema.parse({ tone: "cercana", region: "rioplatense", gender: "femenina" });
   const loaded: LoadedVoice[] = [
     { id: "demo-1", providerVoiceId: "mock-voz-1", region: "rioplatense", gender: "femenina", label: "Voz principal (mock)" },
@@ -110,10 +118,7 @@ function demoVoiceSettings(): VoiceSettingsData {
     role: "owner",
     profile,
     loaded,
-    available: [
-      { providerVoiceId: "mock-voz-1", name: "Voz de prueba 1 (mock)", labels: { accent: "rioplatense", gender: "female" }, category: "mock" },
-      { providerVoiceId: "mock-voz-2", name: "Voz de prueba 2 (mock)", labels: { accent: "neutral", gender: "male" }, category: "mock" },
-    ],
+    available: await new MockMediaProvider().listVoices(),
     availableError: null,
     providerName: "mock",
     resolves: true,

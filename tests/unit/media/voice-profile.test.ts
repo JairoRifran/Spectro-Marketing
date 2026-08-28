@@ -9,7 +9,7 @@ import {
   voiceToneSchema,
   type CatalogueVoice,
 } from "@/server/media/voice-profile";
-import { REGION_LABEL, TONE_LABEL } from "@/features/media/vocabulary";
+import { languageLabel, languagesPresent, REGION_LABEL, TONE_LABEL } from "@/features/media/vocabulary";
 
 const voice = (region: CatalogueVoice["region"], gender: CatalogueVoice["gender"], id: string): CatalogueVoice =>
   ({ providerVoiceId: id, region, gender, label: id });
@@ -142,5 +142,34 @@ describe("translating delivery for the vendor", () => {
     await provider.synthesizeSpeech({ text: "hola", voiceId: "v", language: "es-UY" });
     const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body.voice_settings).toBeUndefined();
+  });
+});
+
+// The filter is built from what an account actually holds. Fixing it to Spanish and English
+// would hide every voice outside them the day somebody adds one.
+describe("language options", () => {
+  const voice = (language?: string): { labels: Record<string, string> } => ({ labels: language ? { language } : {} });
+
+  it("offers only the languages present", () => {
+    expect(languagesPresent([voice("es"), voice("en"), voice("es")]).map((option) => option.code)).toEqual(["en", "es"]);
+  });
+
+  it("names the ones it knows and passes the rest through", () => {
+    expect(languageLabel("es")).toBe("Español");
+    expect(languageLabel("EN")).toBe("Inglés");
+    // A language with no friendly name is still shown, under its code.
+    expect(languageLabel("sw")).toBe("SW");
+  });
+
+  it("is not case sensitive about the provider's codes", () => {
+    expect(languagesPresent([voice("ES"), voice("es")])).toHaveLength(1);
+  });
+
+  it("ignores a voice with no language label rather than inventing one", () => {
+    expect(languagesPresent([voice(), voice("es")]).map((option) => option.code)).toEqual(["es"]);
+  });
+
+  it("offers nothing when no voice says what language it is", () => {
+    expect(languagesPresent([voice(), voice()])).toEqual([]);
   });
 });

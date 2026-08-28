@@ -373,3 +373,25 @@ test("the voice screen is reachable from the navigation", async ({ page }) => {
   await page.getByRole("link", { name: "Voz" }).click();
   await expect(page).toHaveURL(/\/settings\/voice$/);
 });
+
+// Hearing a voice before choosing it. The provider's own sample costs nothing to play.
+test("each voice can be previewed before it is loaded", async ({ page }) => {
+  await page.goto("/settings/voice");
+  const row = page.locator(".voice-available li").filter({ hasText: "Voz de prueba 1" });
+  const player = row.locator("audio");
+  await expect(player).toHaveAttribute("src", /.+/);
+  // Not preloaded: opening the screen must not fetch a sample for every voice in the account.
+  await expect(player).toHaveAttribute("preload", "none");
+});
+
+test("the language filter is built from the voices the account actually has", async ({ page }) => {
+  await page.goto("/settings/voice");
+  const filter = page.getByLabel("Idioma");
+  await expect(filter).toContainText("Español");
+  await expect(filter).toContainText("Inglés");
+
+  await filter.selectOption("es");
+  await expect(page.locator(".voice-available li")).toHaveCount(1);
+  await expect(page.locator(".voice-available")).toContainText("Voz de prueba 1");
+  await expect(page.locator(".voice-available")).not.toContainText("Voz de prueba 2");
+});

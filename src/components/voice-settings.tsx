@@ -9,6 +9,8 @@ import {
   VOICE_GENDERS,
   VOICE_REGIONS,
   VOICE_TONES,
+  languagesPresent,
+  languageLabel,
   type VoiceGenderName,
   type VoiceRegionName,
   type VoiceToneName,
@@ -31,6 +33,7 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
   const [region, setRegion] = useState(data.profile?.region ?? "");
   const [gender, setGender] = useState<VoiceGenderName>(data.profile?.gender ?? "indistinta");
   const [draft, setDraft] = useState<Record<string, { region: string; gender: string }>>({});
+  const [language, setLanguage] = useState("");
   const readOnly = data.role === "viewer";
 
   async function send(body: Record<string, unknown>, failure: string) {
@@ -56,6 +59,13 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
   }
 
   const loadedIds = new Set(data.loaded.map((voice) => voice.providerVoiceId));
+
+  // Built from what the account actually holds, so a language nobody anticipated is still
+  // offered rather than filtered out of existence.
+  const languages = languagesPresent(data.available);
+  const visible = language
+    ? data.available.filter((voice) => voice.labels.language?.toLowerCase() === language)
+    : data.available;
 
   // Rendered beside whatever was pressed. A single notice at the foot of the page is invisible
   // to somebody scrolled down to the list, and a failure nobody sees reads as nothing happening.
@@ -149,15 +159,30 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
       <section className="detail-panel wide">
         <span className="section-kicker">EN TU CUENTA DE {data.providerName.toUpperCase()}</span>
         <h3>Voces disponibles para cargar</h3>
+        {languages.length > 1 && (
+          <div className="voice-filter">
+            <label htmlFor="voice-language">Idioma</label>
+            <select id="voice-language" value={language} onChange={(event) => setLanguage(event.target.value)}>
+              <option value="">Todos ({data.available.length})</option>
+              {languages.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label} ({data.available.filter((voice) => voice.labels.language?.toLowerCase() === option.code).length})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {data.availableError ? (
           // An empty list and a failed lookup are different things, and showing the second as the
           // first would read as "your account has no voices".
           <p className="voice-status warn"><CircleAlert size={14} /> {data.availableError}</p>
         ) : data.available.length === 0 ? (
           <p className="panel-empty">El proveedor no devolvió ninguna voz.</p>
+        ) : visible.length === 0 ? (
+          <p className="panel-empty">Ninguna voz en {languageLabel(language)}.</p>
         ) : (
           <ul className="voice-available">
-            {data.available.map((voice) => {
+            {visible.map((voice) => {
               const already = loadedIds.has(voice.providerVoiceId);
               const pick = draft[voice.providerVoiceId] ?? { region: "", gender: "indistinta" };
               return (
@@ -167,6 +192,11 @@ export function VoiceSettings({ data }: { data: VoiceSettingsData }) {
                     <small>
                       {Object.entries(voice.labels).map(([key, value]) => `${key}: ${value}`).join(" · ") || "Sin etiquetas"}
                     </small>
+                    {/* The provider's own sample. Playing it calls no API and costs nothing;
+                        preload is off so opening the screen does not fetch every voice. */}
+                    {voice.previewUrl
+                      ? <audio className="voice-preview" controls preload="none" src={voice.previewUrl} aria-label={`Escuchar ${voice.name}`} />
+                      : <small className="voice-no-preview">Sin muestra disponible</small>}
                   </div>
                   {already ? (
                     <span className="voice-status ok"><Check size={13} /> Cargada</span>

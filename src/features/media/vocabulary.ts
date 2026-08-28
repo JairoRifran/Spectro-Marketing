@@ -36,3 +36,34 @@ export const GENDER_LABEL: Record<VoiceGenderName, string> = {
   masculina: "Masculina",
   indistinta: "Indistinta",
 };
+
+/**
+ * Friendly names for the language codes a provider labels its voices with.
+ *
+ * A lookup, not a list of what exists: the filter is built from the languages an account
+ * actually has, so a voice in a language missing from this map is still offered — under its raw
+ * code rather than hidden. Hard-coding the options would quietly drop every voice outside them.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  es: "Español",
+  en: "Inglés",
+  pt: "Portugués",
+  fr: "Francés",
+  it: "Italiano",
+  de: "Alemán",
+  ja: "Japonés",
+};
+
+export function languageLabel(code: string): string {
+  return LANGUAGE_NAMES[code.toLowerCase()] ?? code.toUpperCase();
+}
+
+/** The languages present in a set of voices, named and ordered for a dropdown. */
+export function languagesPresent(voices: Array<{ labels: Record<string, string> }>) {
+  const codes = new Set<string>();
+  for (const voice of voices) {
+    const code = voice.labels.language?.trim().toLowerCase();
+    if (code) codes.add(code);
+  }
+  return [...codes].sort().map((code) => ({ code, label: languageLabel(code) }));
+}

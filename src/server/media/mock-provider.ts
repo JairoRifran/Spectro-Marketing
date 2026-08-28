@@ -74,8 +74,32 @@ export class MockMediaProvider implements MediaProvider {
    */
   async listVoices(): Promise<AvailableVoice[]> {
     return [
-      { providerVoiceId: "mock-voz-1", name: "Voz de prueba 1 (mock)", labels: { accent: "rioplatense", gender: "female" }, category: "mock" },
-      { providerVoiceId: "mock-voz-2", name: "Voz de prueba 2 (mock)", labels: { accent: "neutral", gender: "male" }, category: "mock" },
+      {
+        providerVoiceId: "mock-voz-1",
+        name: "Voz de prueba 1 (mock)",
+        labels: { accent: "rioplatense", gender: "female", language: "es" },
+        category: "mock",
+        previewUrl: this.preview("Voz de prueba uno"),
+      },
+      {
+        providerVoiceId: "mock-voz-2",
+        name: "Voz de prueba 2 (mock)",
+        labels: { accent: "american", gender: "male", language: "en" },
+        category: "mock",
+        previewUrl: this.preview("Test voice two"),
+      },
     ];
+  }
+
+  /**
+   * The mock's preview is the mock's own audio, inlined. It keeps the player on the settings
+   * screen exercisable without a vendor, and it cannot be mistaken for a real sample because it
+   * is the same tone the mock synthesises.
+   */
+  private preview(text: string): string {
+    const bytes = encodeWav({ samples: tone(text, 0.4) });
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return `data:audio/wav;base64,${btoa(binary)}`;
   }
 }

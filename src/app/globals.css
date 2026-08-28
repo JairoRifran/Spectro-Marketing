@@ -332,3 +332,8 @@
 .voice-assign .secondary-button{border:1px solid var(--line);background:#fff;color:#33433f}
 .voice-assign .secondary-button:disabled{opacity:.5}
 .voice-notice{margin:12px 0 0;font-size:11px}
+.voice-filter{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.voice-filter label{color:#8b9592;font-size:9px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}
+.voice-filter select{height:32px;padding:0 9px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:10px;color:#233c37}
+.voice-preview{display:block;margin-top:8px;height:30px;max-width:280px}
+.voice-no-preview{display:block;margin-top:8px;color:#a3adaa;font-size:9px}
