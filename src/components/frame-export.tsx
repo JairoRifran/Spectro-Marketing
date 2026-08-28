@@ -1,0 +1,131 @@
+"use client";
+import { useState } from "react";
+import { Download } from "lucide-react";
+import type { BrandIdentity } from "@/server/media/identity";
+import type { FrameSpec } from "@/server/media/spec";
+import type { PlatformContentVariant } from "@/server/content/schemas/variant";
+import { createZip, safeEntryName, type ZipEntry } from "@/lib/zip";
+
+// The pack: every composed frame as a real PNG at delivery size, plus the copy to paste,
+// in one archive.
+//
+// Rasterised in the browser rather than on the server, and that is a deliberate reversal of the
+// obvious design. Server-side rasterisation needs a native dependency and, worse, needs the font
+// available in the runtime — which is exactly where that approach fails quietly, rendering a
+// fallback face nobody notices until the file is public. The browser already has the fonts and
+// a canvas, so it draws the same frame spec the page is showing, and what you download is what
+// you looked at.
+//
+// The third renderer from one spec. Coordinates and line breaks come from composition, so the
+// PNG cannot disagree with the preview about where anything sits.
+
+function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = spec.width;
+  canvas.height = spec.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("canvas_unavailable");
+
+  context.fillStyle = spec.background;
+  context.fillRect(0, 0, spec.width, spec.height);
+
+  for (const block of spec.blocks) {
+    if (block.kind === "rect") {
+      context.fillStyle = block.fill;
+      context.globalAlpha = block.opacity;
+      if (block.radius > 0 && typeof context.roundRect === "function") {
+        context.beginPath();
+        context.roundRect(block.x, block.y, block.width, block.height, block.radius);
+        context.fill();
+      } else {
+        context.fillRect(block.x, block.y, block.width, block.height);
+      }
+      context.globalAlpha = 1;
+      continue;
+    }
+
+    context.font = `${block.weight} ${block.size}px ${identity.fontFamily}`;
+    context.fillStyle = block.fill;
+    context.textAlign = block.align === "center" ? "center" : "left";
+    context.textBaseline = "alphabetic";
+    // Not universally supported; without it the frame is still correct, just a little tighter.
+    if ("letterSpacing" in context) context.letterSpacing = `${block.letterSpacing}px`;
+    block.lines.forEach((line, index) => {
+      context.fillText(line, block.x, block.y + index * block.lineHeight);
+    });
+    if ("letterSpacing" in context) context.letterSpacing = "0px";
+  }
+
+  return canvas;
+}
+
+async function toPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("png_encoding_failed");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/** The text a person pastes into the composer. Kept plain so it survives any editor. */
+function copyFile(variant: PlatformContentVariant): string {
+  const lines = [
+    `Plataforma: ${variant.platform}`,
+    `Formato: ${variant.format}`,
+    "",
+    "— CAPTION —",
+    variant.caption,
+    "",
+    "— GANCHO —",
+    variant.hook,
+    "",
+    "— LLAMADO A LA ACCIÓN —",
+    variant.cta,
+  ];
+  if (variant.onScreenText.length > 0) {
+    lines.push("", "— TEXTO EN PANTALLA —", ...variant.onScreenText.map((text) => `· ${text}`));
+  }
+  if (variant.videoDirection) lines.push("", "— DIRECCIÓN DE VIDEO —", variant.videoDirection);
+  if (variant.visualDirection) lines.push("", "— DIRECCIÓN VISUAL —", variant.visualDirection);
+  lines.push("", "Generado por Spectro. Nada de esto fue publicado.");
+  return lines.join("\n");
+}
+
+export function FrameExport({ variant, frames, identity, title }: {
+  variant: PlatformContentVariant;
+  frames: FrameSpec[];
+  identity: BrandIdentity;
+  title: string;
+}) {
+  const [state, setState] = useState<"idle" | "working" | "error">("idle");
+
+  async function download() {
+    setState("working");
+    try {
+      const entries: ZipEntry[] = [{ name: "copy.txt", bytes: new TextEncoder().encode(copyFile(variant)) }];
+      for (const [index, frame] of frames.entries()) {
+        const png = await toPng(drawFrame(frame, identity));
+        entries.push({ name: `${variant.platform}-${String(index + 1).padStart(2, "0")}-${frame.label}.png`, bytes: png });
+      }
+
+      const archive = createZip(entries);
+      const url = URL.createObjectURL(new Blob([archive as BlobPart], { type: "application/zip" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = safeEntryName(`${variant.platform}-${title}.zip`);
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  }
+
+  return (
+    <div className="frame-export">
+      <button type="button" className="secondary-button" onClick={download} disabled={state === "working"}>
+        <Download size={14} />
+        {state === "working" ? "Armando el paquete…" : frames.length > 0 ? `Descargar ${frames.length === 1 ? "la pieza" : `las ${frames.length} imágenes`} y el texto` : "Descargar el texto"}
+      </button>
+      {state === "error" && <small className="form-error">No se pudo armar el paquete en este navegador.</small>}
+    </div>
+  );
+}

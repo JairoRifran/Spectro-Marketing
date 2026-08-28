@@ -299,3 +299,39 @@ test("the platform is named on the detail page simulation too", async ({ page })
   await page.goto("/content/00000000-0000-0000-0000-000000000602");
   await expect(page.locator(".platform-mockup .mock-tag")).toContainText("TikTok");
 });
+
+// The pack is the deliverable that matters before any integration exists: the frames as real
+// files at delivery size plus the copy to paste, so a piece can be posted by hand today.
+test("a piece can be downloaded as a ready-to-post pack", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000601");
+  const button = page.getByRole("button", { name: /Descargar/ });
+  await expect(button).toBeVisible();
+
+  const download = await Promise.all([page.waitForEvent("download"), button.click()]).then(([event]) => event);
+  expect(download.suggestedFilename()).toMatch(/^instagram-.*\.zip$/);
+
+  const stream = await download.createReadStream();
+  const archive: Buffer = await new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
+  });
+
+  // A real archive, not an empty file.
+  expect(archive.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+
+  // It carries the copy to paste and one image per composed slide, each a genuine PNG.
+  // Read as latin1 so byte patterns survive; assertions stay ASCII for the same reason.
+  const text = archive.toString("latin1");
+  expect(text).toContain("copy.txt");
+  expect(text).toContain("CAPTION");
+  expect(text).toContain("Plataforma: instagram");
+  expect(text).toContain("PNG");
+
+  const images = new Set([...text.matchAll(/instagram-\d\d-[A-Za-z0-9 .-]+\.png/g)].map((match) => match[0]));
+  expect(images.size, "expected one PNG per composed slide").toBeGreaterThanOrEqual(4);
+
+  // Not a blank canvas: a solid-colour frame compresses to almost nothing.
+  expect(archive.length).toBeGreaterThan(20_000);
+});

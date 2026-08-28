@@ -299,3 +299,7 @@
 .mock-frame.has-art .mock-voiceover{padding:14px 46px 0 14px}
 .mock-frame.is-story .mock-frame-art{inset:0}
 .mock-frame.is-story .mock-handle,.mock-frame.is-story .mock-story-role{position:relative;z-index:1}
+.frame-export{margin-top:2px}
+.frame-export button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#33433f;font-size:10px;font-weight:650}
+.frame-export button:hover:not(:disabled){border-color:var(--net);color:var(--net)}
+.frame-export button:disabled{opacity:.6}

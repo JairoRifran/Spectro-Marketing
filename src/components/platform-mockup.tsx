@@ -6,6 +6,7 @@ import type { FrameSpec } from "@/server/media/spec";
 import type { MockAccount } from "@/features/content/account";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
 import { FrameCanvas } from "./frame-canvas";
+import { FrameExport } from "./frame-export";
 import type { BrandIdentity } from "@/server/media/identity";
 
 // What the piece will look like where it lands.
@@ -298,7 +299,7 @@ interface Renderable {
   identity: BrandIdentity;
 }
 
-export function PlatformMockup({ variant, account, frames, identity }: Renderable) {
+export function PlatformMockup({ variant, account, frames, identity, title }: Renderable & { title?: string }) {
   const shape = variant.detail.shape;
   const props = { variant, account, frames, identity };
   return (
@@ -309,6 +310,7 @@ export function PlatformMockup({ variant, account, frames, identity }: Renderabl
       {shape === "carousel" && <Carousel {...props} />}
       {shape === "static" && <StaticPost {...props} />}
       {shape === "text" && <TextPost variant={variant} account={account} />}
+      <FrameExport variant={variant} frames={frames} identity={identity} title={title ?? variant.format} />
       <p className="mock-disclaimer">
         Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance porque
         nada se publicó todavía; cualquier número acá sería inventado.

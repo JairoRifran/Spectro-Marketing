@@ -109,7 +109,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       <StatusPill value={item.status} />
                     </header>
                     {item.variant
-                      ? <PlatformMockup variant={item.variant} account={account} frames={composeFrames(item.variant)} identity={SPECTRO_IDENTITY} />
+                      ? <PlatformMockup variant={item.variant} account={account} frames={composeFrames(item.variant)} identity={SPECTRO_IDENTITY} title={item.title} />
                       : <p className="panel-empty">Planificada, todavía sin escribir.</p>}
                   </article>
                 ))}
