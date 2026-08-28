@@ -7,6 +7,7 @@ import type { MockAccount } from "@/features/content/account";
 import { FORMAT_LABEL, PLATFORM_LABEL } from "@/features/content/labels";
 import { FrameCanvas } from "./frame-canvas";
 import { FrameExport } from "./frame-export";
+import { VerticalChrome } from "./platform-chrome";
 import type { BrandIdentity } from "@/server/media/identity";
 
 // What the piece will look like where it lands.
@@ -111,33 +112,34 @@ function VerticalVideo({ variant, account, frames, identity }: Renderable) {
   return (
     <div className="mock-vertical">
       <div className="mock-phone">
-        <div className={`mock-frame${composed ? " has-art" : ""}`}>
-          {/* The opening frame is the hook: it is what decides whether anything else is read.
-              Where composition produced a frame, that frame is the picture; the platform chrome
-              sits on top of it exactly as it will in the feed. */}
-          {composed ? (
-            <div className="mock-frame-art"><FrameCanvas spec={composed} identity={identity} /></div>
-          ) : (
-            <>
-              <p className="mock-hook">{scene === 0 ? script.hook : current.onScreenText ?? ""}</p>
-              <p className="mock-scene-visual">{current.visual}</p>
-            </>
-          )}
-          {current.voiceover && <p className="mock-voiceover"><Volume2 size={11} /> {current.voiceover}</p>}
-
-          <div className="mock-rail" aria-hidden="true">
-            <span><Heart size={19} /></span>
-            <span><MessageCircle size={19} /></span>
-            <span>{isYouTube ? <Repeat2 size={19} /> : <Bookmark size={19} />}</span>
-            <span><Send size={19} /></span>
+        {composed ? (
+          <VerticalChrome
+            account={account}
+            caption={variant.caption}
+            platform={variant.platform}
+            footer={current.voiceover ? <p className="mock-voiceover"><Volume2 size={11} /> {current.voiceover}</p> : undefined}
+          >
+            <FrameCanvas spec={composed} identity={identity} />
+          </VerticalChrome>
+        ) : (
+          <div className="mock-frame">
+            {/* No composed frame for this scene, so the words stand in for the picture. */}
+            <p className="mock-hook">{scene === 0 ? script.hook : current.onScreenText ?? ""}</p>
+            <p className="mock-scene-visual">{current.visual}</p>
+            {current.voiceover && <p className="mock-voiceover"><Volume2 size={11} /> {current.voiceover}</p>}
+            <div className="mock-rail" aria-hidden="true">
+              <span><Heart size={19} /></span>
+              <span><MessageCircle size={19} /></span>
+              <span>{isYouTube ? <Repeat2 size={19} /> : <Bookmark size={19} />}</span>
+              <span><Send size={19} /></span>
+            </div>
+            <div className="mock-vertical-foot">
+              <p className="mock-handle"><Avatar account={account} /> {account.handle}</p>
+              <p className="mock-vertical-caption">{variant.caption}</p>
+              <p className="mock-sound"><Music2 size={11} /> Audio original · {account.name}</p>
+            </div>
           </div>
-
-          <div className="mock-vertical-foot">
-            <p className="mock-handle"><Avatar account={account} /> {account.handle}</p>
-            <p className="mock-vertical-caption">{variant.caption}</p>
-            <p className="mock-sound"><Music2 size={11} /> Audio original · {account.name}</p>
-          </div>
-        </div>
+        )}
         <p className="mock-duration">{script.estimatedDurationSeconds}s · {script.scenes.length} escenas</p>
       </div>
 

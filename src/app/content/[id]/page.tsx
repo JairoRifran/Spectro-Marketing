@@ -86,6 +86,9 @@ export default async function ContentDetailPage({ params, searchParams }: { para
                     voiceUrl={sound.voice.existing?.url ?? null}
                     musicUrl={sound.music.existing?.url ?? null}
                     label={item.title}
+                    chrome={variant.payload.detail.shape === "video" || variant.payload.detail.shape === "story"
+                      ? { kind: "vertical" as const, platform: variant.payload.platform, account: accountFor(data.orgName), caption: variant.payload.caption }
+                      : { kind: "post" as const, platform: variant.payload.platform, account: accountFor(data.orgName), caption: variant.payload.caption }}
                   />
                 ) : undefined}
                 feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={[

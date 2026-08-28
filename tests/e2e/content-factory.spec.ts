@@ -464,3 +464,25 @@ test("a piece missing audio says which, and offers each with its cost", async ({
   // The price is on every button: nothing here spends without saying what it spends.
   expect(await state.getByRole("button", { name: /Generar ·/ }).count()).toBe(2);
 });
+
+// The assembled view has to show the piece as the platform will, not the artwork on its own:
+// bare frames cannot answer whether the caption covers the last line of the headline.
+test("the assembled playback wears the platform's own interface", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  await page.getByRole("tab", { name: "Ensamblado" }).click();
+
+  const stage = page.locator(".assembled-stage");
+  await expect(stage.locator(".mock-frame")).toBeVisible();
+  await expect(stage.locator(".mock-rail")).toBeVisible();
+  await expect(stage.locator(".mock-handle")).toContainText("@");
+  // Still no invented engagement numbers, in this view either.
+  await expect(stage).not.toHaveText(/\d[\d.,]*\s*(me gusta|vistas|likes)/i);
+});
+
+test("a carousel is assembled inside a feed post, not a phone frame", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000601");
+  await page.getByRole("tab", { name: "Ensamblado" }).click();
+  const stage = page.locator(".assembled-stage");
+  await expect(stage.locator(".mock-post")).toBeVisible();
+  await expect(stage.locator(".mock-frame")).toHaveCount(0);
+});

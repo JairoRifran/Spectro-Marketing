@@ -138,6 +138,9 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                                 voiceUrl={item.audioUrl}
                                 musicUrl={item.musicUrl}
                                 label={item.title}
+                                chrome={variant.detail.shape === "video" || variant.detail.shape === "story"
+                      ? { kind: "vertical" as const, platform: variant.platform, account: account, caption: variant.caption }
+                      : { kind: "post" as const, platform: variant.platform, account: account, caption: variant.caption }}
                               />
                               <SoundActions
                                 contentItemId={item.id}

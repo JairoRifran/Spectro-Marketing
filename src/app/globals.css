@@ -357,8 +357,11 @@
 
 /* --- Assembled preview -------------------------------------------------------------------- */
 .assembled{display:grid;gap:9px}
-.assembled-stage{border-radius:12px;overflow:hidden;background:#0e1f1d;max-width:300px}
-.assembled-stage svg{display:block;width:100%;height:auto}
+.assembled-stage{max-width:300px}
+.assembled-stage .mock-frame{border-radius:16px}
+.assembled-stage .mock-post{max-width:none}
+.assembled-stage .mock-frame-art svg{display:block;width:100%;height:100%;object-fit:cover}
+.assembled-stage>svg{display:block;width:100%;height:auto;border-radius:12px}
 .assembled-controls{display:flex;align-items:center;gap:9px;max-width:300px}
 .assembled-play,.assembled-restart{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:8px;background:#fff;color:#233c37}
 .assembled-play{background:#102b2a;border-color:#102b2a;color:#fff}

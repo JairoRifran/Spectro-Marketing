@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { FrameCanvas } from "./frame-canvas";
+import { PostChrome, VerticalChrome } from "./platform-chrome";
+import type { MockAccount } from "@/features/content/account";
 import { fitToDuration, frameAt, type FrameTiming } from "@/server/media/timing";
 import type { BrandIdentity } from "@/server/media/identity";
 import type { FrameSpec } from "@/server/media/spec";
@@ -22,13 +24,19 @@ import type { FrameSpec } from "@/server/media/spec";
 const MUSIC_UNDER_VOICE = 0.22;
 const MUSIC_ALONE = 0.7;
 
-export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl, label }: {
+export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl, label, chrome }: {
   frames: FrameSpec[];
   timings: FrameTiming[];
   identity: BrandIdentity;
   voiceUrl?: string | null;
   musicUrl?: string | null;
   label: string;
+  /**
+   * The platform interface to play the piece inside. Without it the frames are shown bare, which
+   * is useful for checking the artwork and useless for checking whether the caption covers the
+   * last line of it.
+   */
+  chrome?: { kind: "vertical" | "post"; platform: string; account: MockAccount; caption: string } | null;
 }) {
   const voiceRef = useRef<HTMLAudioElement | null>(null);
   const musicRef = useRef<HTMLAudioElement | null>(null);
@@ -103,7 +111,19 @@ export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl
   return (
     <div className="assembled" aria-label={`Vista ensamblada de ${label}`}>
       <div className="assembled-stage">
-        <FrameCanvas spec={frames[index]} identity={identity} />
+        {chrome?.kind === "vertical" ? (
+          <VerticalChrome account={chrome.account} caption={chrome.caption} platform={chrome.platform}>
+            <FrameCanvas spec={frames[index]} identity={identity} />
+          </VerticalChrome>
+        ) : chrome?.kind === "post" ? (
+          <PostChrome account={chrome.account}>
+            <div className="mock-media is-composed">
+              <FrameCanvas spec={frames[index]} identity={identity} />
+            </div>
+          </PostChrome>
+        ) : (
+          <FrameCanvas spec={frames[index]} identity={identity} />
+        )}
       </div>
 
       <div className="assembled-controls">
