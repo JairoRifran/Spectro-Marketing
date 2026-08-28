@@ -7,6 +7,8 @@ import { PlatformMockup } from "@/components/platform-mockup";
 import { accountFor } from "@/features/content/account";
 import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
+import { AssembledPreview } from "@/components/assembled-preview";
+import { intendedTimings } from "@/server/media/timing";
 import { CONTENT_STATUSES } from "@/server/content-factory/lifecycle";
 import { CONTENT_FORMATS } from "@/server/content/platforms";
 
@@ -108,9 +110,28 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       </div>
                       <StatusPill value={item.status} />
                     </header>
-                    {item.variant
-                      ? <PlatformMockup variant={item.variant} account={account} frames={composeFrames(item.variant)} identity={SPECTRO_IDENTITY} title={item.title} />
-                      : <p className="panel-empty">Planificada, todavía sin escribir.</p>}
+                    {item.variant ? (() => {
+                      const frames = composeFrames(item.variant!);
+                      return (
+                        <>
+                          <PlatformMockup variant={item.variant!} account={account} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} />
+                          {/* Silent here on purpose: signing an audio link for every card would
+                              be one storage round trip per piece just to open the list. The
+                              detail view plays it with the voice. */}
+                          {frames.length > 1 && (
+                            <details className="gallery-assembled">
+                              <summary>Ver ensamblado</summary>
+                              <AssembledPreview
+                                frames={frames}
+                                timings={intendedTimings(item.variant!, frames)}
+                                identity={SPECTRO_IDENTITY}
+                                label={item.title}
+                              />
+                            </details>
+                          )}
+                        </>
+                      );
+                    })() : <p className="panel-empty">Planificada, todavía sin escribir.</p>}
                   </article>
                 ))}
               </div>

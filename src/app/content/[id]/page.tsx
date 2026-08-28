@@ -12,6 +12,8 @@ import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { PreviewTabs } from "@/components/preview-tabs";
 import { VoiceoverAction } from "@/components/voiceover-action";
 import { getVoiceoverPreflight } from "@/features/media/voiceover-preflight";
+import { AssembledPreview } from "@/components/assembled-preview";
+import { intendedTimings } from "@/server/media/timing";
 import { getContentDetail } from "@/features/content/data";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +39,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
   const concept = data.concept as Record<string, string>;
   const quality = data.quality;
   const variant = data.variant;
+  const frames = variant ? composeFrames(variant.payload) : [];
   const review = data.review as Record<string, unknown> | null;
   const pendingDecision = item.status === "waiting_approval" && Boolean(data.approval && data.approval.status === "requested");
   // A blocked or rejected piece can still be rewritten; that is the only way out of those states.
@@ -75,7 +78,16 @@ export default async function ContentDetailPage({ params, searchParams }: { para
             <h3>Cómo se va a consumir</h3>
             {variant ? (
               <PreviewTabs
-                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={composeFrames(variant.payload)} identity={SPECTRO_IDENTITY} title={item.title} audio={voiceover.existing?.url ? { url: voiceover.existing.url, mimeType: "audio/mpeg" } : null} />}
+                assembled={frames.length > 1 ? (
+                  <AssembledPreview
+                    frames={frames}
+                    timings={intendedTimings(variant.payload, frames)}
+                    identity={SPECTRO_IDENTITY}
+                    audioUrl={voiceover.existing?.url ?? null}
+                    label={item.title}
+                  />
+                ) : undefined}
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={voiceover.existing?.url ? { url: voiceover.existing.url, mimeType: "audio/mpeg" } : null} />}
                 production={<ContentPreview variant={variant.payload} />}
               />
             ) : <p className="panel-empty">Todavía no hay una versión escrita.</p>}

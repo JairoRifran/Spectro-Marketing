@@ -416,3 +416,39 @@ test("a piece nobody speaks is not offered a voiceover", async ({ page }) => {
   await expect(page.getByText("Esta pieza no lleva voz en off.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Generar voz en off/ })).toHaveCount(0);
 });
+
+// The assembled view: the frames in sequence with the voice over them. Not a rendered video and
+// it does not claim to be one.
+test("a multi-frame piece can be played as an assembled sequence", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  await page.getByRole("tab", { name: "Ensamblado" }).click();
+
+  const assembled = page.locator(".assembled");
+  await expect(assembled).toBeVisible();
+  await expect(assembled.getByRole("button", { name: "Reproducir" })).toBeVisible();
+  await expect(assembled.getByRole("button", { name: "Volver al principio" })).toBeVisible();
+
+  // One segment per frame, so the pacing is visible rather than only felt.
+  const frames = await page.locator(".assembled-track span").count();
+  expect(frames).toBeGreaterThan(1);
+  await expect(assembled).toContainText(/0\.0s \/ \d+\.\ds/);
+});
+
+test("playing advances the sequence and the play control becomes pause", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  await page.getByRole("tab", { name: "Ensamblado" }).click();
+  const assembled = page.locator(".assembled");
+
+  await assembled.getByRole("button", { name: "Reproducir" }).click();
+  await expect(assembled.getByRole("button", { name: "Pausar" })).toBeVisible();
+  await expect(assembled).not.toContainText("0.0s /");
+});
+
+test("the gallery offers the sequence without fetching audio for every card", async ({ page }) => {
+  await page.goto("/content?view=feed");
+  // Collapsed and silent: signing a link per card would be a storage round trip per piece just
+  // to open the list.
+  const details = page.locator(".gallery-assembled").first();
+  await expect(details.locator("summary")).toHaveText("Ver ensamblado");
+  await expect(details.locator("audio")).toHaveCount(0);
+});
