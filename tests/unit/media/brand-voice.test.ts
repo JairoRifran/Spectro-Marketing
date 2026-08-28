@@ -129,3 +129,29 @@ describe("the migration agrees with the vocabulary", () => {
     expect(/^[\x00-\x7F]*$/.test(sql)).toBe(true);
   });
 });
+
+// The vendor's own interface invites this mistake: its key list shows an identifier, and the
+// secret appears once at creation. The two look alike, so the wrong one gets pasted.
+describe("the misconfigured key hint", () => {
+  const source = readFileSync(new URL("../../../src/features/media/voice-settings.ts", import.meta.url), "utf8");
+
+  it("only speaks up after a call has actually failed", () => {
+    // A prefix is a vendor convention and could change; refusing a working key on a guess would
+    // be worse than the confusion it avoids.
+    const inCatch = source.slice(source.indexOf("} catch (error) {"), source.indexOf("// The database speaks snake_case"));
+    expect(inCatch).toContain("configuredKeyHint");
+    expect(source).not.toMatch(/if \(!key\?\.startsWith\("sk_"\)\) (return|throw)/);
+  });
+
+  it("reports the shape of the value and never the value", () => {
+    const body = source.slice(source.indexOf("function configuredKeyHint"), source.indexOf("export async function getVoiceSettings"));
+    expect(body).toContain("startsWith(\"sk_\")");
+    // Nothing in the message interpolates the key itself.
+    expect(body).not.toMatch(/\$\{key\}/);
+  });
+
+  it("stays quiet when the key already looks right", () => {
+    const body = source.slice(source.indexOf("function configuredKeyHint"), source.indexOf("export async function getVoiceSettings"));
+    expect(body).toContain('key.startsWith("sk_")) return ""');
+  });
+});

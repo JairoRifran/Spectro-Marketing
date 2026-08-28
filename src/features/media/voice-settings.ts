@@ -35,6 +35,24 @@ export interface VoiceSettingsData {
   resolves: boolean;
 }
 
+/**
+ * The mistake this catches is one the vendor's own interface invites.
+ *
+ * Its API keys page shows an identifier for every key, and that is what a copy button there
+ * yields; the secret itself is shown once, when the key is created or rotated. The two look
+ * alike, so the wrong one gets pasted and the only feedback is an authentication error that
+ * says nothing about which of the two values is in play.
+ *
+ * Checked only when a call has already failed, never as a gate: a prefix is a vendor convention
+ * and could change, and refusing a working key because it does not match a guess would be worse
+ * than the confusion this avoids. Reports the shape of the value, never the value.
+ */
+function configuredKeyHint(env: Record<string, string | undefined>): string {
+  const key = env.ELEVENLABS_API_KEY?.trim();
+  if (!key || key.startsWith("sk_")) return "";
+  return "El valor configurado no parece una clave de ElevenLabs: las claves empiezan con 'sk_' y el panel muestra por defecto el identificador, no la clave. Rota la clave para que te muestre la verdadera.";
+}
+
 export async function getVoiceSettings(): Promise<VoiceSettingsData | null> {
   if (isDemoMode) return demoVoiceSettings();
   const ctx = await getOrganizationContext();
@@ -54,7 +72,8 @@ export async function getVoiceSettings(): Promise<VoiceSettingsData | null> {
   try {
     available = provider.listVoices ? await provider.listVoices() : [];
   } catch (error) {
-    availableError = error instanceof Error ? error.message : "No se pudo consultar el proveedor.";
+    const detail = error instanceof Error ? error.message : "No se pudo consultar el proveedor.";
+    availableError = [configuredKeyHint(process.env), detail].filter(Boolean).join(" ");
   }
 
   // The database speaks snake_case; the screen speaks its own shape. One conversion, here.
