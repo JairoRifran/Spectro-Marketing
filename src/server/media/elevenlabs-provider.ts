@@ -1,4 +1,5 @@
 import { MediaProviderError, speechRequestSchema, type MediaProvider, type SpeechRequest, type SpeechResult } from "./provider";
+import type { Delivery } from "./voice-profile";
 
 // The ElevenLabs adapter.
 //
@@ -25,6 +26,24 @@ export interface ElevenLabsConfig {
   voiceId: string;
   /** Injectable so the adapter can be tested without a network. */
   fetchImpl?: typeof fetch;
+}
+
+/**
+ * Neutral delivery into this vendor's settings, within the ranges its documentation states.
+ *
+ * `stability` runs the other way from expressiveness — the vendor describes a high value as more
+ * monotonous — so it is inverted rather than passed through. It is also floored well above zero:
+ * the bottom of that range is erratic rather than expressive, and a brand channel is the wrong
+ * place to find that out.
+ */
+function voiceSettings(delivery: Delivery) {
+  return {
+    stability: Number((0.9 - delivery.expressiveness * 0.6).toFixed(2)),
+    similarity_boost: 0.75,
+    style: Number((delivery.intensity * 0.6).toFixed(2)),
+    use_speaker_boost: true,
+    speed: Number(delivery.pace.toFixed(2)),
+  };
 }
 
 /**
@@ -77,7 +96,9 @@ export class ElevenLabsProvider implements MediaProvider {
           text: parsed.data.text,
           model_id: MODEL,
           output_format: OUTPUT_FORMAT,
-          language_code: parsed.data.language.slice(0, 2),
+          // No language_code: the vendor documents it as ignored by the multilingual model this
+          // uses, and sending a field that is silently dropped only suggests it does something.
+          ...(parsed.data.delivery ? { voice_settings: voiceSettings(parsed.data.delivery) } : {}),
         }),
         // Without this a hung vendor holds the function open until the platform kills it.
         signal: AbortSignal.timeout(TIMEOUT_MS),

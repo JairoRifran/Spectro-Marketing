@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Micros } from "../spend/money";
+import { deliverySchema } from "./voice-profile";
 
 // The provider-neutral contract for producing media.
 //
@@ -23,6 +24,11 @@ export const speechRequestSchema = z.object({
   voiceId: z.string().trim().min(1).max(200),
   /** BCP-47, so a provider can pick a pronunciation model without guessing from the text. */
   language: z.string().trim().min(2).max(12).default("es-UY"),
+  /**
+   * How it should be read, in vendor-neutral terms. Absent means the provider's own neutral
+   * default rather than a guess at what the brand wanted.
+   */
+  delivery: deliverySchema.optional(),
 });
 export type SpeechRequest = z.infer<typeof speechRequestSchema>;
 
