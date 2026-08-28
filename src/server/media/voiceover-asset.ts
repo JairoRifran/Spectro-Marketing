@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBrandVoice, brandVoiceMessage } from "./brand-voice";
 import { buildNarration } from "./narration";
 import { buildMusicBrief } from "./soundtrack";
+import { buildImageRequest } from "./image-brief";
+import { getImageProvider } from "./pollinations-provider";
+import { isDemoMode } from "@/lib/env";
 import { getMediaProvider } from "./providers";
 import { synthesizeVoiceover } from "./voiceover";
 import { withBudget } from "../spend/ledger";
@@ -31,6 +34,10 @@ export type VoiceoverProblem =
   | { problem: "no_narration" }
   | { problem: "no_profile" }
   | { problem: "no_matching_voice"; message: string };
+
+export type ImageProblem =
+  | { problem: "no_direction" }
+  | { problem: "unknown_slot" };
 
 export type MusicProblem =
   | { problem: "no_soundtrack" }
@@ -240,4 +247,110 @@ export async function produceMusic(
   );
 
   return storeAsset(admin, input, MUSIC_SLOT, provider.name, result);
+}
+
+
+/**
+ * Generates the picture for one frame, and keeps it.
+ *
+ * One frame at a time on purpose. The free provider rate limits an anonymous caller to roughly
+ * one image every fifteen seconds, so a carousel generated in a single request would spend a
+ * minute inside one function call and be killed by the platform before it finished. Asking for
+ * one is a request that reliably completes.
+ *
+ * The picture is stored against the slot the composition already refers to, so nothing has to
+ * agree on a name twice.
+ */
+export async function produceImage(
+  admin: SupabaseClient,
+  input: ProduceInput,
+  slot: string,
+): Promise<MediaAsset | ImageProblem> {
+  const existing = await findAsset(admin, input.contentItemId, input.contentVersion, slot);
+  if (existing) return existing;
+
+  const { data: brand } = await admin
+    .from("brands")
+    .select("visual_instructions")
+    .eq("organization_id", input.organizationId)
+    .limit(1)
+    .maybeSingle();
+
+  const request = buildImageRequest(input.variant, slot, (brand as { visual_instructions: string | null } | null)?.visual_instructions ?? "");
+  if (!request) return { problem: "no_direction" };
+
+  const provider = getImageProvider(process.env, isDemoMode);
+
+  // A provider that costs nothing does not touch the ceiling: a reservation worth nothing is a
+  // ledger row that makes reconciling against an invoice harder, which is all the ledger is for.
+  if (!provider.charges) {
+    const image = await provider.generateImage(request);
+    return storeImage(admin, input, slot, provider.name, image);
+  }
+
+  const image = await withBudget(
+    admin,
+    {
+      organizationId: input.organizationId,
+      campaignId: input.campaignId,
+      contentItemId: input.contentItemId,
+      operation: "media.image",
+      provider: provider.name,
+      estimateMicros: provider.costPerImageMicros,
+      idempotencyKey: input.idempotencyKey,
+    },
+    async () => {
+      const generated = await provider.generateImage(request);
+      return { result: generated, summary: `1 imagen ${request.width}x${request.height}` };
+    },
+  );
+
+  return storeImage(admin, input, slot, provider.name, image);
+}
+
+/** Images are stored the same way audio is, but recorded as the kind they actually are. */
+async function storeImage(
+  admin: SupabaseClient,
+  input: ProduceInput,
+  slot: string,
+  provider: string,
+  image: { bytes: Uint8Array; mimeType: string; generatedBy: string },
+): Promise<MediaAsset> {
+  const extension = image.mimeType.includes("png") ? "png" : image.mimeType.includes("webp") ? "webp" : "jpg";
+  const storagePath = `${input.organizationId}/${input.contentItemId}/v${input.contentVersion}/${slot}.${extension}`;
+
+  const upload = await admin.storage.from("content-assets").upload(storagePath, image.bytes, {
+    contentType: image.mimeType,
+    upsert: true,
+  });
+  if (upload.error) throw new Error("storage_upload_failed");
+
+  const { data, error } = await admin
+    .from("content_assets")
+    .upsert({
+      organization_id: input.organizationId,
+      campaign_id: input.campaignId,
+      content_item_id: input.contentItemId,
+      content_version: input.contentVersion,
+      kind: "image",
+      slot,
+      storage_path: storagePath,
+      mime_type: image.mimeType,
+      byte_size: image.bytes.length,
+      generated_by: image.generatedBy,
+      provider,
+    }, { onConflict: "content_item_id,content_version,slot" })
+    .select("id")
+    .single();
+  if (error) throw new Error("asset_record_failed");
+
+  return {
+    id: data.id,
+    storagePath,
+    mimeType: image.mimeType,
+    byteSize: image.bytes.length,
+    durationSeconds: null,
+    generatedBy: image.generatedBy,
+    reused: false,
+  };
 }

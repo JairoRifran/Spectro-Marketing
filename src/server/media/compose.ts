@@ -92,6 +92,22 @@ function eyebrow(cursor: Cursor, text: string, box: ReturnType<typeof contentBox
 }
 
 /**
+ * The place a generated picture goes, with the veil it needs.
+ *
+ * The veil is not decoration. Type over an unknown photograph is unreadable about half the time
+ * — a light headline lands on a bright sky, a dark one on a shadow — and which half is not known
+ * until the picture exists. Darkening it costs a little of the image and buys legibility that
+ * does not depend on luck.
+ */
+function artwork(canvas: Canvas, identity: BrandIdentity, slot: string, fallback: FrameSpec["background"]): FrameBlock[] {
+  return [{
+    kind: "image", x: 0, y: 0, width: canvas.width, height: canvas.height, slot, fallback,
+    // The veil travels with the picture, so a frame without one is not dimmed for nothing.
+    veil: 0.58, veilColour: identity.surface, opacity: 1,
+  }];
+}
+
+/**
  * The surface a frame is built on: a gradient plus two soft shapes placed from the frame's own
  * key. It is what turns a slide from words on a flat rectangle into something designed, and it
  * costs nothing because it is arithmetic rather than a model.
@@ -145,6 +161,9 @@ function frame(
 ): FrameSpec {
   const box = contentBox(canvas);
   const { background, blocks: decoration } = surface(canvas, identity, key, emphatic);
+  // Every frame reserves a place for artwork. Until one exists the designed surface shows
+  // through unchanged, so a piece is never worse for having asked.
+  const picture = artwork(canvas, identity, key, background);
   // What is readable on the tinted surface is checked rather than assumed: a pale brand accent
   // can make the usual ink unreadable, and that only shows up once somebody opens the file.
   const tinted = mix(identity.surface, identity.accent, emphatic ? 0.22 : 0.1);
@@ -156,7 +175,7 @@ function frame(
 
   return {
     key, label, width: canvas.width, height: canvas.height, background,
-    blocks: [...decoration, ...cursor.blocks, ...extra(ink)],
+    blocks: [...picture, ...decoration, ...cursor.blocks, ...extra(ink)],
     truncated: cursor.truncated,
   };
 }

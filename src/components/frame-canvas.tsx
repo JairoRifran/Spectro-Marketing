@@ -13,7 +13,13 @@ import { gradientVector, isGradient, type Fill, type FrameSpec } from "@/server/
 // (1080 wide and up), so the viewBox does the shrinking and the layout stays identical to the
 // asset that will eventually be exported.
 
-export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; identity: BrandIdentity; className?: string }) {
+export function FrameCanvas({ spec, identity, className, images = {} }: {
+  spec: FrameSpec;
+  identity: BrandIdentity;
+  className?: string;
+  /** Links for the picture slots the spec refers to. Absent slots draw their fallback. */
+  images?: Record<string, string>;
+}) {
   // Gradient ids must be unique across the document: two frames on one page would otherwise
   // define the same id and the second would silently take the first one's colours.
   const scope = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -27,7 +33,10 @@ export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; id
   };
 
   const background = paint(spec.background);
-  const painted = spec.blocks.map((block) => ({ block, fill: block.kind === "text" ? block.fill : paint(block.fill) }));
+  const painted = spec.blocks.map((block) => ({
+    block,
+    fill: block.kind === "text" ? block.fill : paint(block.kind === "image" ? block.fallback : block.fill),
+  }));
 
   return (
     <svg
@@ -56,6 +65,26 @@ export function FrameCanvas({ spec, identity, className }: { spec: FrameSpec; id
       {painted.map(({ block, fill }, index) => {
         if (block.kind === "rect") {
           return <rect key={index} x={block.x} y={block.y} width={block.width} height={block.height} rx={block.radius} fill={fill as string} opacity={block.opacity} />;
+        }
+        if (block.kind === "image") {
+          const href = images[block.slot];
+          // No picture yet, so the fallback stands in. A frame is never left as a hole.
+          if (!href) {
+            return <rect key={index} x={block.x} y={block.y} width={block.width} height={block.height} fill={fill as string} opacity={block.opacity} />;
+          }
+          return (
+            <g key={index}>
+              <image
+                x={block.x} y={block.y} width={block.width} height={block.height}
+                href={href}
+                preserveAspectRatio="xMidYMid slice"
+                opacity={block.opacity}
+              />
+              {block.veil > 0 && (
+                <rect x={block.x} y={block.y} width={block.width} height={block.height} fill={block.veilColour} opacity={block.veil} />
+              )}
+            </g>
+          );
         }
         if (block.kind === "ellipse") {
           return <ellipse key={index} cx={block.cx} cy={block.cy} rx={block.rx} ry={block.ry} fill={fill as string} opacity={block.opacity} />;

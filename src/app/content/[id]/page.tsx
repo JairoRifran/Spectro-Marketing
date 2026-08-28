@@ -13,6 +13,8 @@ import { PreviewTabs } from "@/components/preview-tabs";
 import { SoundActions } from "@/components/sound-actions";
 import { getSoundPreflight } from "@/features/media/sound-preflight";
 import { AssembledPreview } from "@/components/assembled-preview";
+import { ImageActions } from "@/components/image-actions";
+import { getFrameImages } from "@/features/media/frame-images";
 import { intendedTimings } from "@/server/media/timing";
 import { getContentDetail } from "@/features/content/data";
 
@@ -40,6 +42,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
   const quality = data.quality;
   const variant = data.variant;
   const frames = variant ? composeFrames(variant.payload) : [];
+  const frameImages = await getFrameImages(id, data.selectedVersion);
   const review = data.review as Record<string, unknown> | null;
   const pendingDecision = item.status === "waiting_approval" && Boolean(data.approval && data.approval.status === "requested");
   // A blocked or rejected piece can still be rewritten; that is the only way out of those states.
@@ -83,6 +86,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
                     frames={frames}
                     timings={intendedTimings(variant.payload, frames)}
                     identity={SPECTRO_IDENTITY}
+                    images={frameImages}
                     voiceUrl={sound.voice.existing?.url ?? null}
                     musicUrl={sound.music.existing?.url ?? null}
                     label={item.title}
@@ -91,7 +95,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
                       : { kind: "post" as const, platform: variant.payload.platform, account: accountFor(data.orgName), caption: variant.payload.caption }}
                   />
                 ) : undefined}
-                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} title={item.title} audio={[
+                feed={<PlatformMockup variant={variant.payload} account={accountFor(data.orgName)} frames={frames} identity={SPECTRO_IDENTITY} images={frameImages} title={item.title} audio={[
                   sound.voice.existing?.url ? { url: sound.voice.existing.url, mimeType: "audio/mpeg", name: "voz-en-off" } : null,
                   sound.music.existing?.url ? { url: sound.music.existing.url, mimeType: "audio/mpeg", name: "musica" } : null,
                 ].filter(Boolean) as Array<{ url: string; mimeType: string; name: string }>} />}
@@ -126,6 +130,17 @@ export default async function ContentDetailPage({ params, searchParams }: { para
             <span className="section-kicker">AUDIO</span>
             <h3>Cómo va a sonar</h3>
             <SoundActions contentItemId={id} demo={data.mode === "demo"} preflight={sound} />
+          </section>
+
+          <section className="detail-panel">
+            <span className="section-kicker">IMÁGENES</span>
+            <h3>Qué se ve detrás</h3>
+            <ImageActions
+              contentItemId={id}
+              demo={data.mode === "demo"}
+              frames={frames.map((frame) => ({ key: frame.key, label: frame.label }))}
+              existing={Object.keys(frameImages)}
+            />
           </section>
 
           <section className="detail-panel">

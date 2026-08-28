@@ -53,6 +53,37 @@ export const ellipseBlockSchema = z.object({
   opacity: z.number().min(0).max(1).default(1),
 });
 
+/**
+ * A generated picture behind the typography.
+ *
+ * It carries a slot name rather than a URL. A spec holding a signed link would stop being
+ * deterministic — it would differ on every read and expire — and the whole value of the spec is
+ * that the same piece composes to the same thing. Renderers resolve the slot against a map of
+ * links supplied at render time, and draw the fallback when there is nothing for it yet.
+ */
+export const imageBlockSchema = z.object({
+  kind: z.literal("image"),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  /** Matches the asset slot the picture is stored under. */
+  slot: z.string().min(1),
+  /** Drawn when no picture exists yet, so a frame is never a hole. */
+  fallback: fillSchema,
+  /**
+   * How much to darken the picture, and with what.
+   *
+   * Applied only when a picture is actually drawn. Type over an unknown photograph is unreadable
+   * about half the time — a light headline lands on a bright sky — and which half is not known
+   * until the picture exists. Veiling the designed fallback as well would dim every frame that
+   * has no artwork, which is most of them.
+   */
+  veil: z.number().min(0).max(1).default(0),
+  veilColour: hexColourSchema,
+  opacity: z.number().min(0).max(1).default(1),
+});
+
 export const textAlignSchema = z.enum(["left", "center"]);
 
 export const textBlockSchema = z.object({
@@ -70,7 +101,7 @@ export const textBlockSchema = z.object({
   opacity: z.number().min(0).max(1).default(1),
 });
 
-export const frameBlockSchema = z.discriminatedUnion("kind", [rectBlockSchema, ellipseBlockSchema, textBlockSchema]);
+export const frameBlockSchema = z.discriminatedUnion("kind", [rectBlockSchema, ellipseBlockSchema, imageBlockSchema, textBlockSchema]);
 
 export const frameSpecSchema = z.object({
   /** Stable within one variant, so a frame keeps its identity across recompositions. */
@@ -87,6 +118,7 @@ export const frameSpecSchema = z.object({
 
 export type RectBlock = z.infer<typeof rectBlockSchema>;
 export type EllipseBlock = z.infer<typeof ellipseBlockSchema>;
+export type ImageBlock = z.infer<typeof imageBlockSchema>;
 export type TextBlock = z.infer<typeof textBlockSchema>;
 export type FrameBlock = z.infer<typeof frameBlockSchema>;
 export type FrameSpec = z.infer<typeof frameSpecSchema>;

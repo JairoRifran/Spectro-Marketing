@@ -24,10 +24,12 @@ import type { FrameSpec } from "@/server/media/spec";
 const MUSIC_UNDER_VOICE = 0.22;
 const MUSIC_ALONE = 0.7;
 
-export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl, label, chrome }: {
+export function AssembledPreview({ frames, timings, identity, images = {}, voiceUrl, musicUrl, label, chrome }: {
   frames: FrameSpec[];
   timings: FrameTiming[];
   identity: BrandIdentity;
+  /** Links for the picture slots the frames refer to. */
+  images?: Record<string, string>;
   voiceUrl?: string | null;
   musicUrl?: string | null;
   label: string;
@@ -113,16 +115,16 @@ export function AssembledPreview({ frames, timings, identity, voiceUrl, musicUrl
       <div className="assembled-stage">
         {chrome?.kind === "vertical" ? (
           <VerticalChrome account={chrome.account} caption={chrome.caption} platform={chrome.platform}>
-            <FrameCanvas spec={frames[index]} identity={identity} />
+            <FrameCanvas spec={frames[index]} identity={identity} images={images} />
           </VerticalChrome>
         ) : chrome?.kind === "post" ? (
           <PostChrome account={chrome.account}>
             <div className="mock-media is-composed">
-              <FrameCanvas spec={frames[index]} identity={identity} />
+              <FrameCanvas spec={frames[index]} identity={identity} images={images} />
             </div>
           </PostChrome>
         ) : (
-          <FrameCanvas spec={frames[index]} identity={identity} />
+          <FrameCanvas spec={frames[index]} identity={identity} images={images} />
         )}
       </div>
 

@@ -37,20 +37,23 @@ test("content detail shows context, native preview, quality and lineage", async 
 test("an Instagram carousel renders as slides with a caption and visual direction", async ({ page }) => {
   await page.goto("/content/00000000-0000-0000-0000-000000000601");
   await page.getByRole("tab", { name: "Producción" }).click();
-  await expect(page.locator(".preview-carousel")).toBeVisible();
-  await expect(page.getByText("Portada", { exact: true })).toBeVisible();
+  // Scoped to the production view: the artwork panel lists the same slide names.
+  const production = page.locator(".preview-carousel");
+  await expect(production).toBeVisible();
+  await expect(production.getByText("Portada", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "Láminas del carrusel" })).toBeVisible();
-  await expect(page.getByText("DIRECCIÓN VISUAL").first()).toBeVisible();
+  await expect(production.getByText("DIRECCIÓN VISUAL").first()).toBeVisible();
 });
 
 test("a TikTok piece renders as a script with scenes and an estimated duration", async ({ page }) => {
   await page.goto("/content/00000000-0000-0000-0000-000000000602");
   await page.getByRole("tab", { name: "Producción" }).click();
-  await expect(page.locator(".preview-video")).toBeVisible();
-  await expect(page.getByText("Escena 1")).toBeVisible();
-  await expect(page.getByText("Texto en pantalla").first()).toBeVisible();
-  await expect(page.getByText("Transición").first()).toBeVisible();
-  await expect(page.getByText(/Duración estimada: \d+s/)).toBeVisible();
+  const production = page.locator(".preview-video");
+  await expect(production).toBeVisible();
+  await expect(production.getByText("Escena 1")).toBeVisible();
+  await expect(production.getByText("Texto en pantalla").first()).toBeVisible();
+  await expect(production.getByText("Transición").first()).toBeVisible();
+  await expect(production.getByText(/Duración estimada: \d+s/)).toBeVisible();
 });
 
 test("quality is reported as checks passed, never as a performance prediction", async ({ page }) => {
@@ -485,4 +488,18 @@ test("a carousel is assembled inside a feed post, not a phone frame", async ({ p
   const stage = page.locator(".assembled-stage");
   await expect(stage.locator(".mock-post")).toBeVisible();
   await expect(stage.locator(".mock-frame")).toHaveCount(0);
+});
+
+// Artwork is asked for one frame at a time, because the free service rate limits to roughly one
+// image every fifteen seconds and a button that generated all of them would be killed mid-flight.
+test("artwork is offered per frame, with the wait explained", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000601");
+  const panel = page.locator(".image-actions");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/una imagen cada 15 segundos/i);
+
+  const slots = panel.locator(".image-slots li");
+  expect(await slots.count()).toBeGreaterThan(1);
+  await expect(slots.first()).toContainText("Portada");
+  await expect(slots.first().getByRole("button", { name: /Generar/ })).toBeVisible();
 });

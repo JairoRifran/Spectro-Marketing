@@ -382,3 +382,10 @@
 .voiceover-quick:disabled{opacity:.6}
 .sound-track+.sound-track{margin-top:14px;padding-top:14px;border-top:1px solid #eef1f0}
 .sound-pending{display:flex;align-items:center;gap:8px}
+
+.image-actions{display:grid;gap:10px}
+.image-slots{margin:0;padding:0;list-style:none;display:grid;gap:5px}
+.image-slots li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.image-slots li.is-done{background:#f6f9f8}
+.image-slot-label{font-size:10px;color:#3f4f4c}
+.image-actions .voiceover-quick{display:inline-flex;align-items:center;gap:5px}

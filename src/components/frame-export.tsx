@@ -35,7 +35,32 @@ function toCanvasFill(context: CanvasRenderingContext2D, fill: Fill, box: { x: n
   return gradient;
 }
 
-function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement {
+/**
+ * Loads a picture for the canvas.
+ *
+ * Cross-origin is requested explicitly: without it the canvas is tainted the moment a remote
+ * image is drawn on it, and `toBlob` then throws — the export would fail only for the pieces
+ * that actually have artwork, which is the worst possible set to fail on.
+ */
+function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+}
+
+/** Covers the box, cropping the overflow, the way the other two renderers do. */
+function drawCover(context: CanvasRenderingContext2D, image: HTMLImageElement, box: { x: number; y: number; width: number; height: number }) {
+  const scale = Math.max(box.width / image.width, box.height / image.height);
+  const width = image.width * scale;
+  const height = image.height * scale;
+  context.drawImage(image, box.x + (box.width - width) / 2, box.y + (box.height - height) / 2, width, height);
+}
+
+function drawFrame(spec: FrameSpec, identity: BrandIdentity, loaded: Map<string, HTMLImageElement>): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = spec.width;
   canvas.height = spec.height;
@@ -55,6 +80,29 @@ function drawFrame(spec: FrameSpec, identity: BrandIdentity): HTMLCanvasElement 
         context.roundRect(block.x, block.y, block.width, block.height, block.radius);
         context.fill();
       } else {
+        context.fillRect(block.x, block.y, block.width, block.height);
+      }
+      context.globalAlpha = 1;
+      continue;
+    }
+
+    if (block.kind === "image") {
+      const image = loaded.get(block.slot);
+      context.globalAlpha = block.opacity;
+      if (image) {
+        context.save();
+        context.beginPath();
+        context.rect(block.x, block.y, block.width, block.height);
+        context.clip();
+        drawCover(context, image, block);
+        context.restore();
+        if (block.veil > 0) {
+          context.globalAlpha = block.veil;
+          context.fillStyle = block.veilColour;
+          context.fillRect(block.x, block.y, block.width, block.height);
+        }
+      } else {
+        context.fillStyle = toCanvasFill(context, block.fallback, block);
         context.fillRect(block.x, block.y, block.width, block.height);
       }
       context.globalAlpha = 1;
@@ -120,13 +168,15 @@ function copyFile(variant: PlatformContentVariant): string {
   return lines.join("\n");
 }
 
-export function FrameExport({ variant, frames, identity, title, audio }: {
+export function FrameExport({ variant, frames, identity, title, audio, images = {} }: {
   variant: PlatformContentVariant;
   frames: FrameSpec[];
   identity: BrandIdentity;
   title: string;
   /** Whatever audio the piece already has. Absent is normal, not a failure. */
   audio?: Array<{ url: string; mimeType: string; name: string }> | null;
+  /** Links for the picture slots the frames refer to. */
+  images?: Record<string, string>;
 }) {
   const [state, setState] = useState<"idle" | "working" | "error">("idle");
   // A pack that shipped without its audio is not a failure, but it is not silent either.
@@ -137,8 +187,17 @@ export function FrameExport({ variant, frames, identity, title, audio }: {
     setNote(null);
     try {
       const entries: ZipEntry[] = [{ name: "copy.txt", bytes: new TextEncoder().encode(copyFile(variant)) }];
+
+      // Every picture is loaded once, before any frame is drawn: a canvas cannot wait mid-draw,
+      // and loading per frame would fetch the same file for every slide that uses it.
+      const loaded = new Map<string, HTMLImageElement>();
+      for (const [slot, url] of Object.entries(images)) {
+        const image = await loadImage(url);
+        if (image) loaded.set(slot, image);
+      }
+
       for (const [index, frame] of frames.entries()) {
-        const png = await toPng(drawFrame(frame, identity));
+        const png = await toPng(drawFrame(frame, identity, loaded));
         entries.push({ name: `${variant.platform}-${String(index + 1).padStart(2, "0")}-${frame.label}.png`, bytes: png });
       }
 

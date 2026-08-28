@@ -21,7 +21,7 @@ function escapeXml(value: string) {
     .replace(/'/g, "&apos;");
 }
 
-export function renderFrameSvg(spec: FrameSpec, identity: BrandIdentity = SPECTRO_IDENTITY): string {
+export function renderFrameSvg(spec: FrameSpec, identity: BrandIdentity = SPECTRO_IDENTITY, images: Record<string, string> = {}): string {
   const defs: string[] = [];
   let gradientCount = 0;
 
@@ -47,6 +47,23 @@ export function renderFrameSvg(spec: FrameSpec, identity: BrandIdentity = SPECTR
       parts.push(
         `<rect x="${block.x}" y="${block.y}" width="${block.width}" height="${block.height}" rx="${block.radius}" fill="${paint(block.fill)}" opacity="${block.opacity}"/>`,
       );
+      continue;
+    }
+    if (block.kind === "image") {
+      const href = images[block.slot];
+      if (!href) {
+        // No picture yet, so the fallback stands in. A frame is never left as a hole.
+        parts.push(`<rect x="${block.x}" y="${block.y}" width="${block.width}" height="${block.height}" fill="${paint(block.fallback)}" opacity="${block.opacity}"/>`);
+        continue;
+      }
+      parts.push(
+        `<image x="${block.x}" y="${block.y}" width="${block.width}" height="${block.height}" href="${escapeXml(href)}" preserveAspectRatio="xMidYMid slice" opacity="${block.opacity}"/>`,
+      );
+      if (block.veil > 0) {
+        parts.push(
+          `<rect x="${block.x}" y="${block.y}" width="${block.width}" height="${block.height}" fill="${escapeXml(block.veilColour)}" opacity="${block.veil}"/>`,
+        );
+      }
       continue;
     }
     if (block.kind === "ellipse") {

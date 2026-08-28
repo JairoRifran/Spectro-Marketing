@@ -41,7 +41,7 @@ export const CONSERVATIVE_RATES: RateCard = {
   minimumChargeMicros: 1_000,
 };
 
-export const paidOperationSchema = z.enum(["media.tts", "media.sfx", "media.music"]);
+export const paidOperationSchema = z.enum(["media.tts", "media.sfx", "media.music", "media.image"]);
 export type PaidOperation = z.infer<typeof paidOperationSchema>;
 
 export interface TtsEstimateInput {
