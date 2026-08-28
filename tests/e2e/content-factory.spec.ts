@@ -395,3 +395,24 @@ test("the language filter is built from the voices the account actually has", as
   await expect(page.locator(".voice-available")).toContainText("Voz de prueba 1");
   await expect(page.locator(".voice-available")).not.toContainText("Voz de prueba 2");
 });
+
+// The first place in Spectro where pressing something spends money, so the money is on screen
+// before the button is.
+test("the cost of a voiceover is shown before it can be produced", async ({ page }) => {
+  await page.goto("/content/00000000-0000-0000-0000-000000000602");
+  const panel = page.locator(".voiceover-action");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/\d+ caracteres/);
+  await expect(panel).toContainText(/costo estimado/);
+  await expect(panel).toContainText(/US\$|\$/);
+  await expect(panel.getByRole("button", { name: /Generar voz en off/ })).toBeVisible();
+  await expect(panel).toContainText(/Nada se publica/);
+});
+
+test("a piece nobody speaks is not offered a voiceover", async ({ page }) => {
+  // A carousel is read by the person scrolling it. Offering to narrate it would be selling
+  // something nobody asked for.
+  await page.goto("/content/00000000-0000-0000-0000-000000000601");
+  await expect(page.getByText("Esta pieza no lleva voz en off.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Generar voz en off/ })).toHaveCount(0);
+});

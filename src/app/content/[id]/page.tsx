@@ -10,6 +10,8 @@ import { accountFor } from "@/features/content/account";
 import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { PreviewTabs } from "@/components/preview-tabs";
+import { VoiceoverAction } from "@/components/voiceover-action";
+import { getVoiceoverPreflight } from "@/features/media/voiceover-preflight";
 import { getContentDetail } from "@/features/content/data";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,7 @@ export default async function ContentDetailPage({ params, searchParams }: { para
   const query = await searchParams;
   const data = await getContentDetail(id, Number(query.v) || undefined);
   if (!data) notFound();
+  const voiceover = await getVoiceoverPreflight(id, data.selectedVersion, data.variant?.payload ?? null);
 
   const item = data.item;
   const concept = data.concept as Record<string, string>;
@@ -99,6 +102,12 @@ export default async function ContentDetailPage({ params, searchParams }: { para
               ]} />
             </section>
           )}
+
+          <section className="detail-panel">
+            <span className="section-kicker">VOZ EN OFF</span>
+            <h3>Cómo va a sonar</h3>
+            <VoiceoverAction contentItemId={id} demo={data.mode === "demo"} preflight={voiceover} />
+          </section>
 
           <section className="detail-panel">
             <span className="section-kicker">CALIDAD</span>

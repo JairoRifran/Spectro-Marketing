@@ -337,3 +337,16 @@
 .voice-filter select{height:32px;padding:0 9px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:10px;color:#233c37}
 .voice-preview{display:block;margin-top:8px;height:30px;max-width:280px}
 .voice-no-preview{display:block;margin-top:8px;color:#a3adaa;font-size:9px}
+
+.voiceover-action{display:grid;gap:8px;justify-items:start}
+.voiceover-cost{margin:0;color:#66736f;font-size:11px}
+.voiceover-cost strong{color:#233c37}
+.voiceover-note{color:#8b9592;font-size:9px;line-height:1.5}
+.voiceover-none{margin:0;color:#a3adaa;font-size:11px}
+.voiceover-ready{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d3ebe0;border-radius:9px;background:#eefaf4;color:#12805f}
+.voiceover-ready strong{display:block;font-size:11px}
+.voiceover-ready small{display:block;margin-top:1px;color:#4c5b58;font-size:9px}
+.voiceover-error{display:flex;align-items:flex-start;gap:6px;margin:0;font-size:10px;line-height:1.5}
+.voiceover-action .secondary-button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#33433f;font-size:10px;font-weight:650}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}

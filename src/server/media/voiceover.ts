@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { withBudget } from "../spend/ledger";
 import { estimateCost, ratesFromEnv, type RateCard } from "../spend/pricing";
 import { speechRequestSchema, type MediaProvider, type SpeechResult } from "./provider";
+import type { Delivery } from "./voice-profile";
 
 // Synthesising a voiceover, with the ceiling in the path rather than beside it.
 //
@@ -22,6 +23,8 @@ export interface VoiceoverInput {
   text: string;
   voiceId: string;
   language?: string;
+  /** How it should be read, already resolved from the brand's chosen tone. */
+  delivery?: Delivery;
   /**
    * Stable for one logical request, supplied by the caller.
    *
@@ -44,6 +47,7 @@ export async function synthesizeVoiceover(
     text: input.text,
     voiceId: input.voiceId,
     language: input.language ?? "es-UY",
+    delivery: input.delivery,
   });
 
   // Estimated from the string that will actually be sent, so the ceiling is enforced against
