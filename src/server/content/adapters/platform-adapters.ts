@@ -30,7 +30,11 @@ export const instagramAdapter: PlatformAdapter = {
       body: context.concept.coreIdea,
       caption,
       cta: "Guardá esta pieza para volver a ella.",
-      visualDirection: "Sistema visual consistente en todas las láminas; portada legible en miniatura.",
+      visualDirection: format === "carousel"
+        ? "Sistema visual consistente en todas las láminas; portada legible en miniatura."
+        : "Encuadre vertical, texto fuera del cuarto inferior donde va el caption.",
+      videoDirection: format === "carousel" ? undefined : "Cambio de plano dentro de los primeros 2 segundos; subtítulos quemados para lectura sin sonido.",
+      estimatedDurationSeconds: format === "carousel" ? undefined : 30,
       detail: format === "carousel"
         ? { shape: "carousel", carousel: { cover: { headline: hook, visualNote: "Portada legible a 160 px." }, slides, ctaSlide: { headline: "Guardalo", body: context.concept.audience.promise, visualNote: "Cierre con marca discreta." }, caption, visualDirection: "Paleta y tipografía de marca en todas las láminas." } }
         : { shape: "video", script: { hook, setup: context.concept.audience.problem, beats: [context.concept.coreIdea], payoff: context.concept.audience.promise, cta: "Guardalo", estimatedDurationSeconds: 30, onScreenText: [hook], scenes: [{ durationSeconds: 30, visual: "Plano cenital mostrando el proceso.", onScreenText: hook }], shotNotes: [] } },

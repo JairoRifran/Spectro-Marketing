@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { briefsFor, draftsFor, getAdapter } from "@/server/content/adapters";
+import { evaluateContent } from "@/server/content/quality/evaluator";
 import { generateMockVariants, isMockContent, MOCK_NOTICE } from "@/server/content/adapters/mock-generator";
 import { comparableText, DUPLICATE_THRESHOLD } from "@/server/content/quality/duplication";
 import { textSimilarity } from "@/server/content/quality/text";
@@ -87,6 +88,22 @@ describe("platform adapters", () => {
         const variant = adapter.draft({ ...context, concept });
         expect(variant.detail.shape, `${platform}/${format} -> ${chosen}`).toBe(shapeOf(chosen));
         expect(variant.format).toBe(chosen);
+      }
+    }
+  });
+
+  // An Instagram Reel reached production without video direction and the quality gate blocked
+  // it, correctly. The gate is the last line of defence, not the first: an adapter must not
+  // emit a draft its own evaluator would reject, for any format it can produce.
+  it("emits a draft that passes the quality gate for every format it can produce", () => {
+    for (const platform of SUPPORTED_PLATFORMS) {
+      const adapter = getAdapter(platform);
+      for (const format of CONTENT_FORMATS) {
+        if (!supportsFormat(platform, format)) continue;
+        const concept = { ...context.concept, format, platforms: [platform] as typeof context.concept.platforms };
+        const scoped = { ...context, concept };
+        const review = evaluateContent({ items: [{ brief: adapter.brief(scoped), variant: adapter.draft(scoped) }] });
+        expect(review.errors, `${platform}/${format}: ${JSON.stringify(review.errors)}`).toEqual([]);
       }
     }
   });
