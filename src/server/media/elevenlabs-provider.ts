@@ -47,6 +47,22 @@ function voiceSettings(delivery: Delivery) {
 }
 
 /**
+ * The vendor's own explanation for a failure, made safe to show.
+ *
+ * Hiding it entirely was over-correction: an error that says only "responded 400" cannot be
+ * acted on by the person who has to fix it, and the difference between a wrong key and a key
+ * without permission to read voices is exactly what they need to know. What must not escape is
+ * the credential and the submitted text, so both are stripped by force rather than by trust.
+ */
+async function vendorReason(response: Response, secrets: string[]): Promise<string> {
+  const raw = await response.text().catch(() => "");
+  if (!raw) return "";
+  const detail = raw.slice(0, 300);
+  const cleaned = secrets.reduce((text, secret) => (secret ? text.split(secret).join("[oculto]") : text), detail);
+  return cleaned.replace(/\s+/g, " ").trim();
+}
+
+/**
  * Maps a vendor response onto the contract's reasons.
  *
  * Nothing here is documented as a fixed error code, so the mapping is by status class and
@@ -111,7 +127,12 @@ export class ElevenLabsProvider implements MediaProvider {
     }
 
     if (!response.ok) {
-      throw new MediaProviderError(reasonFor(response.status), this.name, `El proveedor de voz respondio ${response.status}.`);
+      const detail = await vendorReason(response, [this.config.apiKey, parsed.data.text]);
+      throw new MediaProviderError(
+        reasonFor(response.status),
+        this.name,
+        `El proveedor de voz respondio ${response.status}${detail ? `: ${detail}` : "."}`,
+      );
     }
 
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -150,7 +171,13 @@ export class ElevenLabsProvider implements MediaProvider {
     }
 
     if (!response.ok) {
-      throw new MediaProviderError(reasonFor(response.status), this.name, `El proveedor de voz respondio ${response.status}.`);
+      // Listing carries no user content, so the vendor's explanation is safe once the key is out.
+      const detail = await vendorReason(response, [this.config.apiKey]);
+      throw new MediaProviderError(
+        reasonFor(response.status),
+        this.name,
+        `El proveedor de voz respondio ${response.status}${detail ? `: ${detail}` : "."}`,
+      );
     }
 
     const payload = (await response.json().catch(() => null)) as { voices?: unknown } | null;

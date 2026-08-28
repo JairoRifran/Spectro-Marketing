@@ -117,14 +117,66 @@ describe("the credential never leaks", () => {
   });
 
   it("keeps the key and the script out of a vendor rejection", async () => {
-    const { provider } = providerWith(new Response("bad key", { status: 401 }));
+    const body = JSON.stringify({ detail: `rejected key ${KEY} for text ${request.text}` });
+    const { provider } = providerWith(new Response(body, { status: 401 }));
     const error = await provider.synthesizeSpeech(request).catch((thrown) => thrown);
     expect(error.message).not.toContain(KEY);
     expect(error.message).not.toContain(request.text);
+    expect(error.message).toContain("[oculto]");
+  });
+
+  it("still says why the vendor refused, so it can be acted on", async () => {
+    // "Responded 400" cannot be acted on. Whether the key is wrong or merely lacks permission to
+    // read voices is exactly what the person fixing it needs to know.
+    const body = JSON.stringify({ detail: { status: "missing_permissions", message: "The API key is missing the permission voices_read." } });
+    const { provider } = providerWith(new Response(body, { status: 400 }));
+    const error = await provider.listVoices!().catch((thrown) => thrown);
+    expect(error.message).toContain("400");
+    expect(error.message).toContain("missing_permissions");
+  });
+
+  it("does not let a huge vendor body become the error message", async () => {
+    const { provider } = providerWith(new Response("x".repeat(5_000), { status: 400 }));
+    const error = await provider.listVoices!().catch((thrown) => thrown);
+    expect(error.message.length).toBeLessThan(400);
   });
 
   it("refuses to construct without a key, instead of calling with an empty credential", () => {
     expect(() => new ElevenLabsProvider({ apiKey: "" })).toThrow(MediaProviderError);
+  });
+});
+
+describe("listing the account's voices", () => {
+  const listing = (voices: unknown) => new Response(JSON.stringify({ voices }), { status: 200, headers: { "content-type": "application/json" } });
+
+  it("reads the vendor's labels through untouched, as hints", async () => {
+    // Reading "accent: latin american" as a region would put a Mexican voice on a Rioplatense
+    // brand on a guess, so nothing here is interpreted.
+    const { provider } = providerWith(listing([{ voice_id: "v1", name: "Sofia", labels: { accent: "latin american", gender: "female" } }]));
+    const [voice] = await provider.listVoices!();
+    expect(voice.labels).toEqual({ accent: "latin american", gender: "female" });
+    expect(voice).not.toHaveProperty("region");
+  });
+
+  it("drops a voice with no identifier rather than offering a dead option", async () => {
+    const { provider } = providerWith(listing([{ name: "sin id" }, { voice_id: "v2", name: "Diego" }]));
+    const voices = await provider.listVoices!();
+    expect(voices.map((voice) => voice.providerVoiceId)).toEqual(["v2"]);
+  });
+
+  it("falls back to the identifier when a voice has no name", async () => {
+    const { provider } = providerWith(listing([{ voice_id: "v3" }]));
+    expect((await provider.listVoices!())[0].name).toBe("v3");
+  });
+
+  it("treats an unreadable payload as a failure, not as an empty account", async () => {
+    const { provider } = providerWith(new Response("no soy json", { status: 200 }));
+    await expect(provider.listVoices!()).rejects.toMatchObject({ reason: "unavailable" });
+  });
+
+  it("survives labels that are not strings", async () => {
+    const { provider } = providerWith(listing([{ voice_id: "v4", name: "X", labels: { accent: "neutral", age: 42 } }]));
+    expect((await provider.listVoices!())[0].labels).toEqual({ accent: "neutral" });
   });
 });
 
