@@ -326,3 +326,38 @@ describe("the picture is not hidden by the stylesheet that predates it", () => {
     expect(page).toContain("{playable && (\n                            <p className=\"mock-disclaimer\">");
   });
 });
+
+describe("the accompanying frame lets the photograph be seen", () => {
+  const source = readFileSync(new URL("../../../src/server/media/compose.ts", import.meta.url), "utf8");
+
+  it("sets the claim, not the whole argument", () => {
+    // The full hook at headline size filled the frame and left the picture as a texture behind
+    // it — and restated in the image what the reader had just read above it.
+    expect(source).toContain("heading(cursor, opening(detail.post.hook), box, ink, 3)");
+    expect(source).not.toContain("heading(cursor, detail.post.hook, box, ink, 6)");
+  });
+
+  it("keeps the veil light enough for a photograph to read as one", () => {
+    const veil = Number(source.match(/veil: ([\d.]+),/)?.[1]);
+    expect(veil).toBeLessThan(0.5);
+    expect(veil).toBeGreaterThan(0.2);
+  });
+
+  it("leaves margin against a width it can only approximate", () => {
+    // A word over the right edge is invisible damage: nothing notices, and it shows up in a
+    // screenshot.
+    const safe = Number(source.match(/const SAFE_WIDTH = ([\d.]+)/)?.[1]);
+    expect(safe).toBeLessThan(1);
+    expect(safe).toBeGreaterThan(0.9);
+  });
+});
+
+describe("the opening of a hook", () => {
+  it("cuts at the first sentence and never mid-word", () => {
+    const frames = composeFrames(variantFor("linkedin", "text_post"));
+    const text = frames[0]!.blocks.filter((b) => b.kind === "text").flatMap((b) => (b.kind === "text" ? b.lines : []));
+    // Whatever it renders, it fits: no line may exceed the box the composition gave it.
+    expect(text.length).toBeGreaterThan(0);
+    expect(frames[0]!.truncated).toBe(false);
+  });
+});

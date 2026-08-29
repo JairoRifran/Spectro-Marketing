@@ -21,6 +21,17 @@ import { measure, wrapClamped } from "./text";
 // for, and confining it to the text box would leave every frame with a permanent border.
 
 const HEADLINE_SIZES = [104, 92, 80, 68, 58, 48];
+
+/**
+ * How much of the measured width to actually use.
+ *
+ * Width comes from a character-class approximation, not from the font that ends up rendering, and
+ * the approximation runs light for heavy weights at large sizes: a headline measured as fitting
+ * rendered past the right edge of the frame. A word over the edge is invisible damage -- nothing
+ * in the pipeline notices, and it only shows up in a screenshot. Three percent costs a little
+ * room on every line and removes a whole class of that.
+ */
+const SAFE_WIDTH = 0.97;
 const BODY_SIZES = [44, 40, 36, 32];
 const EYEBROW_SIZE = 26;
 
@@ -45,14 +56,30 @@ function layout(text: string, width: number, remaining: number, sizes: number[],
     const fits = Math.floor(remaining / lineHeight);
     if (fits < 1) continue;
     const budget = Math.min(maxLines, fits);
-    const wrapped = wrapClamped(text, width, size, budget);
+    const wrapped = wrapClamped(text, width * SAFE_WIDTH, size, budget);
     if (wrapped.lines.length <= budget && !wrapped.truncated) return { size, lineHeight, ...wrapped };
   }
   const size = ordered[ordered.length - 1];
   const lineHeight = Math.round(size * ratio);
   const fits = Math.floor(remaining / lineHeight);
   if (fits < 1) return { size, lineHeight, lines: [] as string[], truncated: true };
-  return { size, lineHeight, ...wrapClamped(text, width, size, Math.min(maxLines, fits)) };
+  return { size, lineHeight, ...wrapClamped(text, width * SAFE_WIDTH, size, Math.min(maxLines, fits)) };
+}
+
+/**
+ * The first sentence of a hook, for a frame that accompanies text the reader already has.
+ *
+ * A headline is not a paragraph set large. Cutting at the first full stop keeps the claim and
+ * drops the argument, which is what belongs on an image sitting under the post that makes it.
+ */
+function opening(hook: string, limit = 90) {
+  const trimmed = hook.trim();
+  const stop = trimmed.search(/[.!?](\s|$)/);
+  const sentence = stop > 20 ? trimmed.slice(0, stop + 1) : trimmed;
+  if (sentence.length <= limit) return sentence;
+  const cut = sentence.slice(0, limit);
+  const space = cut.lastIndexOf(" ");
+  return `${space > 40 ? cut.slice(0, space) : cut}…`;
 }
 
 function heading(cursor: Cursor, text: string, box: ReturnType<typeof contentBox>, colour: string, maxLines: number) {
@@ -103,7 +130,11 @@ function artwork(canvas: Canvas, identity: BrandIdentity, slot: string, fallback
   return [{
     kind: "image", x: 0, y: 0, width: canvas.width, height: canvas.height, slot, fallback,
     // The veil travels with the picture, so a frame without one is not dimmed for nothing.
-    veil: 0.58, veilColour: identity.surface, opacity: 1,
+    // Lowered from 0.58. That was chosen before any picture existed, against the worst case of
+    // an unknown photograph, and in practice it left the image as a dark texture nobody could
+    // read as a photograph. This is still enough to keep a light headline off a bright sky; the
+    // ink is contrast-checked against it either way.
+    veil: 0.42, veilColour: identity.surface, opacity: 1,
   }];
 }
 
@@ -253,10 +284,13 @@ export function composeFrames(variant: PlatformContentVariant, identity: BrandId
     // and a wall of unbroken text is what a feed scrolls past. So the frame is deliberately
     // spare -- the hook, and the call to action under it -- because it accompanies the post
     // rather than restating it. Whoever publishes can attach it or ignore it.
+    // Three lines, not six, and the hook's opening rather than all of it. The full hook set at
+    // headline size filled the frame and left the photograph as a texture behind it -- which is
+    // the opposite of accompanying the post, and it restates in the image what the reader has
+    // already read directly above.
     return [frame("post", "Acompaña al post", canvas, identity, true, (cursor, box, ink, accent) => {
       eyebrow(cursor, "Acompaña al post", box, accent);
-      heading(cursor, detail.post.hook, box, ink, 6);
-      paragraph(cursor, detail.post.cta, box, ink, 2);
+      heading(cursor, opening(detail.post.hook), box, ink, 3);
     })];
   }
 
