@@ -83,3 +83,22 @@ describe("the lease outlives the worker by as little as possible", () => {
     expect(lease).toBeLessThan(limit * 2);
   });
 });
+
+describe("a half-finished chain can be reached from the screen", () => {
+  const page = read("../../../src/app/campaigns/[id]/page.tsx");
+  const button = read("../../../src/components/campaign-run-button.tsx");
+
+  it("offers the button while a campaign is mid-chain", () => {
+    // The resume path existed in the API and was unreachable: a campaign sitting in `researching`
+    // drew a status pill saying it was busy, and nothing to press.
+    expect(page).toContain('resumable=c.status==="researching"');
+    expect(page).toContain("runnable||resumable");
+  });
+
+  it("says it is continuing, not starting over", () => {
+    // Someone who reads "Run Campaign Brain" on a half-finished campaign has every reason to
+    // think pressing it discards the stages already paid for.
+    expect(button).toContain("Continuar estrategia");
+    expect(button).toMatch(/sin rehacer lo terminado/);
+  });
+});

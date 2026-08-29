@@ -16,7 +16,12 @@ const STAGES = ["Estructurando la estrategia", "Investigando el mercado", "Prior
 /** Bounded so a chain that never drains stops asking instead of looping against the API forever. */
 const MAX_CALLS = 12;
 
-export function CampaignRunButton({ id, demo }: { id: string; demo: boolean }) {
+export function CampaignRunButton({ id, demo, resume = false }: {
+  id: string;
+  demo: boolean;
+  /** The chain already started and stopped partway, so this continues it rather than opening a new one. */
+  resume?: boolean;
+}) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
   const [stage, setStage] = useState(0);
@@ -45,8 +50,9 @@ export function CampaignRunButton({ id, demo }: { id: string; demo: boolean }) {
   return (
     <div className="run-action">
       <button className="primary-button" onClick={run} disabled={state === "running"}>
-        {state === "running" ? `${STAGES[stage]}…` : "Run Campaign Brain"}
+        {state === "running" ? `${STAGES[stage]}…` : resume ? "Continuar estrategia" : "Run Campaign Brain"}
       </button>
+      {resume && state === "idle" && <small>La estrategia quedó a medias. Continúa donde se cortó, sin rehacer lo terminado.</small>}
       {state === "error" && <small>No se pudo completar. Revisá actividad y estado.</small>}
     </div>
   );
