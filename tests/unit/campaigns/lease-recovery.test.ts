@@ -121,10 +121,10 @@ describe("a stage waiting out its backoff is not a failure", () => {
   });
 
   it("runs research below the effort that timed out", () => {
-    // Measured, not chosen: at high effort this stage exceeded the deadline and was requeued as
-    // anthropic_timeout. The draft is one hard judgement and still runs high.
+    // Measured twice: it exceeded the deadline at high, then again at medium. Reading a context
+    // and organising what is in it is not where a reasoning budget earns anything.
     const research = briefs.slice(briefs.indexOf('"campaign.research"'), briefs.indexOf('"campaign.channel_strategy"'));
-    expect(research).toContain('effort: "medium"');
+    expect(research).toContain('effort: "low"');
     const draft = briefs.slice(briefs.indexOf('"campaign.strategy.draft"'), briefs.indexOf('"campaign.research"'));
     expect(draft).toContain('effort: "high"');
   });

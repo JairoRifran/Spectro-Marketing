@@ -33,12 +33,13 @@ export const MODEL = "claude-opus-5";
  * running under a lease nobody releases. Failing first turns that into a retryable error the
  * runtime already knows what to do with.
  *
- * The gap has to cover what happens after the failure, not just the failure. The first timeout in
- * production wrote the task's error row and then vanished before writing its activity entry: ten
- * seconds was enough to fail and not enough to finish saying so. A retry nobody can see in the
- * audit trail is the same as no audit trail on the one occasion it matters.
+ * It was briefly cut to forty on the theory that the bookkeeping after a failure needed more
+ * room, because a timeout had written the task's error row and not its activity entry. The data
+ * refuted that: the error row was written fine at fifty, and the activity entry is still missing
+ * at forty. The audit gap is a different bug with a different cause, and the ten seconds bought
+ * nothing while making the stage that was already too slow slower to fit.
  */
-const CALL_TIMEOUT_MS = 40_000;
+const CALL_TIMEOUT_MS = 50_000;
 
 /**
  * How much the model may generate, per task.
