@@ -187,3 +187,29 @@ describe("what governs how long a call takes", () => {
     expect(budgets.get("campaign.strategy.finalize")!).toBeLessThan(budgets.get("campaign.strategy.draft")!);
   });
 });
+
+describe("nothing escapes untranslated", () => {
+  const source = readFileSync(new URL("../../../src/server/agents/anthropic/provider.ts", import.meta.url), "utf8");
+
+  it("guards the validation, not only the request", () => {
+    // The API drops the constraints it cannot enforce into descriptions, so an over-long list
+    // comes back accepted and is rejected here instead. That threw a bare ZodError past the
+    // catch, which the boundary flattened into "internal_error", naming nothing.
+    const body = source.slice(source.indexOf("private async ask"));
+    const guard = body.indexOf("try {");
+    expect(guard).toBeGreaterThan(-1);
+    expect(body.indexOf("parsed_output")).toBeGreaterThan(guard);
+    expect(body.indexOf("catch (error)")).toBeGreaterThan(body.indexOf("parsed_output"));
+  });
+
+  it("names an error it did not predict", () => {
+    // One that says which field was too long costs no deploy to identify.
+    expect(source).toContain("${error.name}: ${error.message}");
+    expect(source).toContain("anthropic_output_rejected");
+  });
+
+  it("tells the model the limits are enforced after the fact", () => {
+    const briefs = readFileSync(new URL("../../../src/server/agents/anthropic/briefs.ts", import.meta.url), "utf8");
+    expect(briefs).toMatch(/Respeta los limites que el esquema declara/);
+  });
+});

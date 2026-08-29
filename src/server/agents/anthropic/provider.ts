@@ -132,7 +132,10 @@ function translate(error: unknown): never {
     const retryable = typeof error.status === "number" && error.status >= 500;
     throw new DomainError("provider", `Anthropic respondió ${error.status ?? "sin estado"}: ${error.message}`, "anthropic_failed", retryable);
   }
-  throw new DomainError("provider", error instanceof Error ? error.message : "Falla desconocida del proveedor.", "anthropic_failed", true);
+  // Named, because the ones that land here are the ones nobody predicted. A ZodError that says
+  // only "failed" costs a deploy to identify; one that says which field was too long costs none.
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  throw new DomainError("provider", `La respuesta del modelo no pudo procesarse. ${detail}`.slice(0, 900), "anthropic_output_rejected", true);
 }
 
 export class AnthropicProvider implements AgentProvider {
@@ -164,12 +167,19 @@ export class AnthropicProvider implements AgentProvider {
   }
 
   private async ask(brief: Brief, context: AgentContext) {
-    const schema = askable(brief.schema);
-    let message;
+    // The whole body is guarded, not just the call.
+    //
+    // Only the request used to be wrapped, and the validation is not in the request: the API
+    // drops the constraints it does not support -- maxLength, maxItems, minimum -- into
+    // descriptions, so a list of twenty-five items or a six-hundred character string comes back
+    // accepted, and the SDK rejects it here against the same Zod schema. That threw a bare
+    // ZodError past the catch, which the boundary flattened into "internal_error", non-retryable,
+    // naming nothing. The stage was lost to a sentence that fits every failure.
     try {
+      const schema = askable(brief.schema);
       // Streamed rather than awaited whole: a high-effort answer against a schema this size is
       // long enough to trip a request timeout, and a timeout here costs the stage.
-      message = await anthropic().messages.stream({
+      const message = await anthropic().messages.stream({
         model: MODEL,
         max_tokens: MAX_TOKENS[context.task.type] ?? DEFAULT_MAX_TOKENS,
         // Adaptive lets the model spend thought where the task is genuinely hard — a channel
@@ -187,22 +197,24 @@ export class AnthropicProvider implements AgentProvider {
         // wall-clock and does not care whether bytes are still arriving.
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
       }).finalMessage();
+
+      if (message.stop_reason === "refusal") {
+        throw new DomainError("provider", "El modelo se negó a responder esta tarea.", "anthropic_refused", false);
+      }
+      if (message.stop_reason === "max_tokens") {
+        // The answer is cut mid-structure, so it would fail parsing anyway; saying why is better
+        // than reporting a schema error that points nowhere.
+        throw new DomainError("provider", "La respuesta se cortó por longitud antes de completarse.", "anthropic_truncated", true);
+      }
+      // Reading this is what runs the client-side validation, so it belongs inside the guard.
+      const parsed = message.parsed_output;
+      if (!parsed) {
+        throw new DomainError("validation", "El modelo devolvió una respuesta que no cumple el esquema.", "anthropic_output_invalid", true);
+      }
+      return parsed as Record<string, unknown>;
     } catch (error) {
       translate(error);
     }
-
-    if (message.stop_reason === "refusal") {
-      throw new DomainError("provider", "El modelo se negó a responder esta tarea.", "anthropic_refused", false);
-    }
-    if (message.stop_reason === "max_tokens") {
-      // The answer is cut mid-structure, so it would fail parsing anyway; saying why is better
-      // than reporting a schema error that points nowhere.
-      throw new DomainError("provider", "La respuesta se cortó por longitud antes de completarse.", "anthropic_truncated", true);
-    }
-    if (!message.parsed_output) {
-      throw new DomainError("validation", "El modelo devolvió una respuesta que no cumple el esquema.", "anthropic_output_invalid", true);
-    }
-    return message.parsed_output as Record<string, unknown>;
   }
 }
 

@@ -28,6 +28,7 @@ const HOUSE = [
   "- Los campos de justificación los lee una persona para decidir. Escribilos como se lo explicarías a un colega: qué decidiste y por qué. No son un registro de tu razonamiento.",
   "- Respetá al pie de la letra las palabras y afirmaciones prohibidas de la marca. Se validan después de forma determinística y una violación bloquea la campaña entera.",
   "- Spectro no publica en redes, no programa posteos, no gestiona pauta y no reporta métricas de rendimiento. No escribas como si lo hiciera.",
+  "- Respeta los limites que el esquema declara en cada campo. Un maximo de elementos o de caracteres no es una sugerencia: la respuesta se valida contra ellos despues de recibirla, y una lista de mas se rechaza entera. Ante la duda, menos elementos y mas cortos.",
 ].join("\n");
 
 const UPSTREAM = [
