@@ -23,7 +23,7 @@ export function CampaignRunButton({ id, demo, resume = false }: {
   resume?: boolean;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<"idle" | "running" | "error">("idle");
+  const [state, setState] = useState<"idle" | "running" | "waiting" | "error">("idle");
   const [stage, setStage] = useState(0);
 
   async function run() {
@@ -34,11 +34,15 @@ export function CampaignRunButton({ id, demo, resume = false }: {
     for (let call = 0; call < MAX_CALLS; call += 1) {
       const response = await fetch(`/api/campaigns/${id}/run`, { method: "POST" });
       if (!response.ok) { setState("error"); return; }
-      const result = (await response.json()) as { done?: boolean };
+      const result = (await response.json()) as { done?: boolean; report?: { claimed?: number } };
       // Refreshed on every pass, so the pipeline view fills in as the work happens rather than
       // arriving all at once at the end.
       router.refresh();
       if (result.done) { setState("idle"); return; }
+      // Work remains but none was claimable: a stage failed and is waiting out its retry
+      // backoff. Asking again immediately cannot help, and twelve refusals in a row would end
+      // in "could not complete" — which is wrong. It is waiting, not broken.
+      if (result.report?.claimed === 0) { setState("waiting"); return; }
       setStage((current) => Math.min(current + 1, STAGES.length - 1));
     }
 
@@ -53,6 +57,7 @@ export function CampaignRunButton({ id, demo, resume = false }: {
         {state === "running" ? `${STAGES[stage]}…` : resume ? "Continuar estrategia" : "Run Campaign Brain"}
       </button>
       {resume && state === "idle" && <small>La estrategia quedó a medias. Continúa donde se cortó, sin rehacer lo terminado.</small>}
+      {state === "waiting" && <small>Una etapa se pasó de tiempo y espera su reintento. Volvé a intentar en un minuto; lo terminado no se rehace.</small>}
       {state === "error" && <small>No se pudo completar. Revisá actividad y estado.</small>}
     </div>
   );

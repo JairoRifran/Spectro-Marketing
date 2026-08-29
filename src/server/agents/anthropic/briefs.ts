@@ -72,7 +72,11 @@ export const BRIEFS: Record<string, Brief> = {
     role: "market_intelligence",
     promptVersion: CAMPAIGN_PROMPTS.research.version,
     schema: researchReportSchema,
-    effort: "high",
+    // Measured, not chosen: at high effort this stage exceeded the call deadline and was
+    // requeued as anthropic_timeout, twice. Its schema is a dozen parallel lists, which is
+    // breadth rather than depth -- the kind of work that grows with thinking time without
+    // getting better. The draft, which is genuinely one hard judgement, still runs high.
+    effort: "medium",
     system: role(
       "Sos quien investiga el mercado. Tu valor no es acumular afirmaciones: es separar lo que se sostiene con lo que hay de lo que haría falta salir a averiguar.",
     ),

@@ -102,3 +102,30 @@ describe("a half-finished chain can be reached from the screen", () => {
     expect(button).toMatch(/sin rehacer lo terminado/);
   });
 });
+
+describe("a stage waiting out its backoff is not a failure", () => {
+  const button = read("../../../src/components/campaign-run-button.tsx");
+  const briefs = read("../../../src/server/agents/anthropic/briefs.ts");
+
+  it("stops asking when nothing was claimable", () => {
+    // Work remains but none is claimable while a retry's backoff runs. Twelve refusals in a row
+    // would end in "could not complete", which is the wrong thing to tell someone whose campaign
+    // is merely waiting.
+    expect(button).toContain("result.report?.claimed === 0");
+    expect(button).toContain('setState("waiting")');
+  });
+
+  it("says it is waiting, and that nothing paid for is redone", () => {
+    expect(button).toMatch(/espera su reintento/);
+    expect(button).toMatch(/no se rehace/);
+  });
+
+  it("runs research below the effort that timed out", () => {
+    // Measured, not chosen: at high effort this stage exceeded the deadline and was requeued as
+    // anthropic_timeout. The draft is one hard judgement and still runs high.
+    const research = briefs.slice(briefs.indexOf('"campaign.research"'), briefs.indexOf('"campaign.channel_strategy"'));
+    expect(research).toContain('effort: "medium"');
+    const draft = briefs.slice(briefs.indexOf('"campaign.strategy.draft"'), briefs.indexOf('"campaign.research"'));
+    expect(draft).toContain('effort: "high"');
+  });
+});
