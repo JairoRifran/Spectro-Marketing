@@ -32,8 +32,13 @@ export const MODEL = "claude-opus-5";
  * limit is killed together with the function, which loses the answer *and* leaves the task marked
  * running under a lease nobody releases. Failing first turns that into a retryable error the
  * runtime already knows what to do with.
+ *
+ * The gap has to cover what happens after the failure, not just the failure. The first timeout in
+ * production wrote the task's error row and then vanished before writing its activity entry: ten
+ * seconds was enough to fail and not enough to finish saying so. A retry nobody can see in the
+ * audit trail is the same as no audit trail on the one occasion it matters.
  */
-const CALL_TIMEOUT_MS = 50_000;
+const CALL_TIMEOUT_MS = 40_000;
 
 /** Provenance is stamped, never asked for — a model can only guess at its own. */
 export const STAMPED = ["provider", "model", "promptVersion"] as const;

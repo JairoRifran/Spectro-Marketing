@@ -16,20 +16,22 @@ const STAGES = ["Estructurando la estrategia", "Investigando el mercado", "Prior
 /** Bounded so a chain that never drains stops asking instead of looping against the API forever. */
 const MAX_CALLS = 12;
 
-export function CampaignRunButton({ id, demo, resume = false }: {
+export function CampaignRunButton({ id, demo, resume = false, startStage = 0 }: {
   id: string;
   demo: boolean;
   /** The chain already started and stopped partway, so this continues it rather than opening a new one. */
   resume?: boolean;
+  /** How many stages are already stored, so a resume names the stage it is really on. */
+  startStage?: number;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "waiting" | "error">("idle");
-  const [stage, setStage] = useState(0);
+  const [stage, setStage] = useState(startStage);
 
   async function run() {
     if (demo) { router.refresh(); return; }
     setState("running");
-    setStage(0);
+    setStage(startStage);
 
     for (let call = 0; call < MAX_CALLS; call += 1) {
       const response = await fetch(`/api/campaigns/${id}/run`, { method: "POST" });
