@@ -1,4 +1,7 @@
 import type { ZodType } from "zod";
+import type { RuntimeTask } from "@/server/tasks/types";
+import { contentCopySchemaFor } from "./content-schema";
+import type { ContentCopyTaskInput } from "@/server/content-factory/mock-content";
 import { campaignBriefSchema, campaignDraftSchema, channelStrategySchema, contentPlanSchema, researchReportSchema } from "@/server/campaigns/schemas";
 import { CAMPAIGN_PROMPTS } from "@/server/campaigns/prompts";
 import { contentCopyOutputSchema, creativeReviewOutputSchema } from "@/server/content-factory/schemas";
@@ -43,6 +46,13 @@ export interface Brief {
   promptVersion: string;
   /** Also validated client-side; the schema sent to the model omits the stamped fields. */
   schema: ZodType;
+  /**
+   * A schema built for this particular task, when one shape does not fit every case.
+   *
+   * The writer is the only agent that needs it: its type describes every production shape at
+   * once, and sending all of them compiled to a grammar the API refused as too large.
+   */
+  schemaFor?: (task: RuntimeTask) => ZodType;
   system: string;
   instruction: string;
   /** Judgement-heavy steps get room to think; mechanical ones do not need it. */
@@ -162,6 +172,7 @@ export const BRIEFS: Record<string, Brief> = {
     role: "copywriter",
     promptVersion: CONTENT_PROMPTS.contentCopy.version,
     schema: contentCopyOutputSchema,
+    schemaFor: (task) => contentCopySchemaFor(task.input as unknown as ContentCopyTaskInput),
     // Lowered from high before it has failed. Every campaign stage above low missed the
     // deadline, and this schema is the largest of them all -- a full native variant with its
     // slides or its script. Unlike those, this one is a single focused piece of writing rather

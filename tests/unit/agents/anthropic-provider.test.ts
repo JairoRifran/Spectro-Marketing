@@ -213,3 +213,28 @@ describe("nothing escapes untranslated", () => {
     expect(briefs).toMatch(/Respeta los limites que el esquema declara/);
   });
 });
+
+describe("the writer is asked for one shape, not five", () => {
+  const source = readFileSync(new URL("../../../src/server/agents/anthropic/content-schema.ts", import.meta.url), "utf8");
+
+  it("takes the shape from the adapter that will render it", () => {
+    // Not a mapping restated here: platform and format resolve to a shape through the same
+    // adapter the rest of the system uses, and that resolution has been got wrong twice.
+    expect(source).toContain("getAdapter(input.brief.platform).draft");
+    expect(source).toContain("detail.shape");
+  });
+
+  it("does not ask the writer for facts the plan already decided", () => {
+    // Which piece this is, and who generated it. The code writes them back.
+    for (const field of ["conceptId", "platform", "format", "generatedBy", "metadata"]) {
+      expect(source, field).toContain(`${field}: true`);
+    }
+  });
+
+  it("covers every production shape the union can carry", () => {
+    // A missing branch would throw at request time, on one platform only, in production.
+    for (const shape of ["video", "carousel", "story", "text", "static"]) {
+      expect(source, shape).toContain(`${shape}: z.object({ shape: z.literal("${shape}")`);
+    }
+  });
+});

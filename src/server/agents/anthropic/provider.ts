@@ -177,7 +177,7 @@ export class AnthropicProvider implements AgentProvider {
     // ZodError past the catch, which the boundary flattened into "internal_error", non-retryable,
     // naming nothing. The stage was lost to a sentence that fits every failure.
     try {
-      const schema = askable(brief.schema);
+      const schema = askable(brief.schemaFor?.(context.task) ?? brief.schema);
       // Streamed rather than awaited whole: a high-effort answer against a schema this size is
       // long enough to trip a request timeout, and a timeout here costs the stage.
       const message = await anthropic().messages.stream({
