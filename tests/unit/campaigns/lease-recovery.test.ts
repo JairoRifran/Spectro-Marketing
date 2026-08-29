@@ -174,6 +174,10 @@ describe("re-running an attempt is not a collision", () => {
     // five-digit Postgres code, which the boundary flattened into "internal_error".
     expect(dispatcher3).toContain('onConflict: "organization_id,idempotency_key"');
     expect(dispatcher3).not.toMatch(/from\("agent_runs"\)\s*\.insert\(/);
+    // Both run tables or neither: fixing one moved the same 23505 down a line and changed
+    // nothing anybody could see.
+    expect(dispatcher3).toContain('onConflict: "task_id,attempt_number"');
+    expect(dispatcher3).not.toMatch(/from\("task_runs"\)\s*\.insert\(/);
   });
 
   it("stops throwing bare Errors from the execution path", () => {

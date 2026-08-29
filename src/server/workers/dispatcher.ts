@@ -75,7 +75,12 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
   if(!executionAllowed({autonomyLevel:agent.autonomy_level,riskLevel:task.risk_level,requiresApproval:task.requires_approval,hasApproval:Boolean(approved)}))
     return finishFailure(db,task,workerId,new DomainError("authorization","La politica de autonomia no permite ejecutar esta tarea.","autonomy_denied",false));
   const runKey = `task:${task.id}:attempt:${task.attempt_count}`;
-  const { data: taskRun, error: taskRunError } = await db.from("task_runs").insert({ organization_id: task.organization_id, task_id: task.id, agent_id: agent.id, attempt_number: task.attempt_count, worker_id: workerId, status: "running", input: task.input, correlation_id: correlationId }).select("id").single();
+  // Upserted for the same reason agent_runs is: task_runs is unique on task and attempt number,
+  // so re-running an attempt that already has a row collided with 23505. Fixing only the sibling
+  // table moved the failure one line down and changed nothing a user could see.
+  const { data: taskRun, error: taskRunError } = await db.from("task_runs")
+    .upsert({ organization_id: task.organization_id, task_id: task.id, agent_id: agent.id, attempt_number: task.attempt_count, worker_id: workerId, status: "running", input: task.input, correlation_id: correlationId }, { onConflict: "task_id,attempt_number" })
+    .select("id").single();
   if (taskRunError) return finishFailure(db, task, workerId, new DomainError("dependency", `No se pudo registrar la corrida: ${taskRunError.code ?? taskRunError.message}`, "task_run_insert_failed", false));
   // Upserted, not inserted.
   //
