@@ -40,6 +40,30 @@ export const MODEL = "claude-opus-5";
  */
 const CALL_TIMEOUT_MS = 40_000;
 
+/**
+ * How much the model may generate, per task.
+ *
+ * This is the lever that actually governs wall-clock time, and it was a single flat 16,000 for
+ * every call. Adaptive thinking spends from the same budget, so a stage with nothing much to say
+ * could still think its way to the deadline: research kept timing out not because its answer is
+ * long -- a dozen short lists -- but because nothing told it to stop.
+ *
+ * The numbers are sized to the schema behind each one, with room to spare. Too small is not free
+ * either: the answer stops mid-structure and comes back as a truncation, which is a clean failure
+ * but still a failure.
+ */
+const MAX_TOKENS: Record<string, number> = {
+  "campaign.strategy.draft": 10_000,
+  "campaign.research": 6_000,
+  "campaign.channel_strategy": 8_000,
+  "campaign.content_plan": 8_000,
+  "campaign.strategy.finalize": 4_000,
+  // The largest schema by far: a full native variant, with its slides or its script.
+  "content.copy": 16_000,
+  "content.creative_review": 8_000,
+};
+const DEFAULT_MAX_TOKENS = 8_000;
+
 /** Provenance is stamped, never asked for — a model can only guess at its own. */
 export const STAMPED = ["provider", "model", "promptVersion"] as const;
 
@@ -147,7 +171,7 @@ export class AnthropicProvider implements AgentProvider {
       // long enough to trip a request timeout, and a timeout here costs the stage.
       message = await anthropic().messages.stream({
         model: MODEL,
-        max_tokens: 16_000,
+        max_tokens: MAX_TOKENS[context.task.type] ?? DEFAULT_MAX_TOKENS,
         // Adaptive lets the model spend thought where the task is genuinely hard — a channel
         // strategy is not a campaign draft — instead of a fixed budget paid on every call.
         thinking: { type: "adaptive" },

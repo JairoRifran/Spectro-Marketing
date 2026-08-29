@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { AnthropicProvider, MODEL, STAMPED, askable, pinIdentity } from "@/server/agents/anthropic/provider";
@@ -158,5 +159,31 @@ describe("provenance", () => {
   it("keeps the deterministic provider distinguishable", () => {
     expect(new MockProvider().name).toBe("mock");
     expect(new AnthropicProvider().name).toBe("anthropic");
+  });
+});
+
+describe("what governs how long a call takes", () => {
+  const source = readFileSync(new URL("../../../src/server/agents/anthropic/provider.ts", import.meta.url), "utf8");
+
+  it("sizes the token budget per task instead of one number for all", () => {
+    // A flat 16,000 was the real cause of the timeouts: adaptive thinking spends from the same
+    // budget, so a stage with a dozen short lists to write could still think to the deadline.
+    expect(source).toContain("const MAX_TOKENS: Record<string, number>");
+    expect(source).toContain("MAX_TOKENS[context.task.type] ?? DEFAULT_MAX_TOKENS");
+  });
+
+  it("gives every brief a budget", () => {
+    const block = source.slice(source.indexOf("const MAX_TOKENS"), source.indexOf("const DEFAULT_MAX_TOKENS"));
+    for (const type of Object.keys(BRIEFS)) expect(block, type).toContain(`"${type}"`);
+  });
+
+  it("leaves the writer the most room and the closer the least", () => {
+    const block = source.slice(source.indexOf("const MAX_TOKENS"), source.indexOf("const DEFAULT_MAX_TOKENS"));
+    const budgets = new Map<string, number>();
+    for (const [, type, value] of block.matchAll(/"([\w.]+)":\s*([\d_]+)/g)) {
+      budgets.set(type, Number(value.replace(/_/g, "")));
+    }
+    expect(budgets.get("content.copy")!).toBeGreaterThan(budgets.get("campaign.research")!);
+    expect(budgets.get("campaign.strategy.finalize")!).toBeLessThan(budgets.get("campaign.strategy.draft")!);
   });
 });
