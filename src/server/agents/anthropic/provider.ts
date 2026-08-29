@@ -25,6 +25,16 @@ import { BRIEFS, type Brief } from "./briefs";
 
 export const MODEL = "claude-opus-5";
 
+/**
+ * How long one call may take.
+ *
+ * Shorter than the invocation that wraps it, on purpose. A call left running past the platform's
+ * limit is killed together with the function, which loses the answer *and* leaves the task marked
+ * running under a lease nobody releases. Failing first turns that into a retryable error the
+ * runtime already knows what to do with.
+ */
+const CALL_TIMEOUT_MS = 50_000;
+
 /** Provenance is stamped, never asked for — a model can only guess at its own. */
 export const STAMPED = ["provider", "model", "promptVersion"] as const;
 
@@ -123,7 +133,9 @@ export class AnthropicProvider implements AgentProvider {
     const schema = askable(brief.schema);
     let message;
     try {
-      message = await anthropic().messages.parse({
+      // Streamed rather than awaited whole: a high-effort answer against a schema this size is
+      // long enough to trip a request timeout, and a timeout here costs the stage.
+      message = await anthropic().messages.stream({
         model: MODEL,
         max_tokens: 16_000,
         // Adaptive lets the model spend thought where the task is genuinely hard — a channel
@@ -132,7 +144,7 @@ export class AnthropicProvider implements AgentProvider {
         output_config: { effort: brief.effort, format: zodOutputFormat(schema) },
         system: brief.system,
         messages: [{ role: "user", content: [contextFor(context), "", brief.instruction].join("\n") }],
-      });
+      }, { timeout: CALL_TIMEOUT_MS }).finalMessage();
     } catch (error) {
       translate(error);
     }

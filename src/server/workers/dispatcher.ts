@@ -13,7 +13,9 @@ import { persistContentOutcome } from "@/server/content-factory/outcomes";
 type AgentRow = { id: string; organization_id: string; role: string; display_name: string; autonomy_level: 0|1|2|3; configuration: Record<string,unknown> };
 
 export interface DispatchReport { workerId: string; schedules: number; events: number; claimed: number; completed: number; retried: number; failed: number; queued: number; running: number; staleLeases: number; }
-export interface ManualCampaignReport { workerId:string; claimed:number; completed:number; retried:number; failed:number; }
+export interface ManualCampaignReport { workerId:string; claimed:number; completed:number; retried:number; failed:number;
+  /** True when the runner stopped because its time budget ran out, not because the queue drained. */
+  exhausted:boolean; }
 
 export async function dispatch(options: { workerId: string; batchSize: number; leaseSeconds: number }): Promise<DispatchReport> {
   const db = createAdminClient();
@@ -121,10 +123,27 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
   return decision.retry ? "retried" : "failed";
 }
 
-export async function runManualCampaignTasks(options:{campaignId:string;maxSteps:number;leaseSeconds:number}):Promise<ManualCampaignReport>{
+/**
+ * Drain a campaign's queue, for as long as this invocation is allowed to live.
+ *
+ * The step count bounds how much work is attempted; `budgetMs` bounds how long. Both are needed
+ * once a real model answers: a deterministic step returns in milliseconds, so a step count was a
+ * fine proxy for time, but a model can spend a minute on a single answer. Without a time budget
+ * the platform kills the function mid-task, which leaves the task marked `running` under a lease
+ * nobody will release until it expires — the campaign then reports itself busy for two minutes
+ * for no reason, and the work of the step that was killed is lost rather than retried.
+ *
+ * Stopping before the budget is spent is what makes this resumable: the next call claims the
+ * next task and continues, because nothing about the chain lives in this function's memory.
+ */
+export async function runManualCampaignTasks(options:{campaignId:string;maxSteps:number;leaseSeconds:number;budgetMs?:number}):Promise<ManualCampaignReport>{
   const db=createAdminClient();const workerId=`manual-campaign:${options.campaignId}:${crypto.randomUUID()}`;
-  const report:ManualCampaignReport={workerId,claimed:0,completed:0,retried:0,failed:0};
+  const report:ManualCampaignReport={workerId,claimed:0,completed:0,retried:0,failed:0,exhausted:false};
+  const startedAt=Date.now();const budget=options.budgetMs??Number.POSITIVE_INFINITY;
   for(let step=0;step<options.maxSteps;step+=1){
+    // Checked before claiming, never mid-task: a task claimed and then abandoned is worse than a
+    // task not claimed at all.
+    if(Date.now()-startedAt>=budget){report.exhausted=true;break;}
     const{data,error}=await db.rpc("claim_campaign_task",{p_campaign_id:options.campaignId,p_worker_id:workerId,p_lease_seconds:options.leaseSeconds});
     if(error)throw new Error(`Campaign task claim failed: ${error.code}`);
     const task=(data?.[0]??null) as RuntimeTask|null;if(!task)break;

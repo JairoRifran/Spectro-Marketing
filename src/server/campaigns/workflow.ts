@@ -1,7 +1,27 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runManualCampaignTasks } from "@/server/workers/dispatcher";
+import { configuredAgentProviderName } from "@/server/agents/provider";
 import { DomainError } from "@/server/errors";
+
+// How much of Campaign Brain runs in one HTTP request.
+//
+// The deterministic provider answers in milliseconds, so the whole five-stage chain fit in one
+// call and the endpoint was written assuming it always would. A real model does not: one stage
+// can take most of a minute on its own, and five of them exceed any serverless limit. So when a
+// model is answering, an invocation claims a single stage and returns what it did; the caller
+// asks again until the chain is drained. Nothing about the chain lives in memory between calls,
+// which is what makes that safe.
+const STRATEGY_STAGES = 5;
+const stepsPerCall = () => (configuredAgentProviderName() === "mock" ? STRATEGY_STAGES + 1 : 1);
+/** Leaves room inside the platform's limit for the reads and the response after the last stage. */
+const BUDGET_MS = 45_000;
+
+/** Whether the chain still owes work, asked of the database rather than inferred. */
+async function pendingTasks(db: ReturnType<typeof createAdminClient>, campaignId: string) {
+  const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("campaign_id", campaignId).in("status", ["queued", "running"]);
+  return count ?? 0;
+}
 
 export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string){
   const db=createAdminClient();
@@ -24,8 +44,27 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   if(taskError||!task)throw new DomainError("non_retryable","Could not start Campaign Brain.","campaign_task_create_failed",false);
   await db.from("campaigns").update({status:"researching"}).eq("id",campaignId).eq("organization_id",organizationId);
   await db.from("activity_log").insert({organization_id:organizationId,campaign_id:campaignId,action:"campaign.research_started",actor_type:"user",actor_id:userId,entity_type:"campaign",entity_id:campaignId,task_id:task.id,summary:"Campaign Brain started manually",metadata:{strategy_version:version,automation_enabled:false}});
-  const report=await runManualCampaignTasks({campaignId,maxSteps:6,leaseSeconds:120});
-  if(report.failed>0||report.completed!==5)throw new DomainError("non_retryable","Campaign Brain did not complete every strategic stage.","campaign_workflow_incomplete",false);
+  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:120,budgetMs:BUDGET_MS});
+  // A stage that failed is a real failure and stops the run. A stage not reached yet is not:
+  // the caller continues from where this invocation left off.
+  if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
   const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
-  return{taskId:task.id,status:finished?.status??"researching",strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
+  return{taskId:task.id,done:await pendingTasks(db,campaignId)===0,status:finished?.status??"researching",strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
+}
+
+/**
+ * Continue a chain that is already under way.
+ *
+ * Separate from starting one because the guards are opposite: starting refuses when tasks are
+ * already queued, and continuing is only meaningful when they are. Collapsing the two would mean
+ * a resume could silently open a second strategy version.
+ */
+export async function resumeCampaignBrainForOrganization(organizationId:string,campaignId:string){
+  const db=createAdminClient();
+  const {data:campaign,error}=await db.from("campaigns").select("id,status,strategy_version").eq("id",campaignId).eq("organization_id",organizationId).single();
+  if(error||!campaign)throw new DomainError("authorization","Campaign unavailable.","campaign_not_found",false);
+  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:120,budgetMs:BUDGET_MS});
+  if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
+  const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
+  return{taskId:null,done:await pendingTasks(db,campaignId)===0,status:finished?.status??campaign.status,strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
 }
