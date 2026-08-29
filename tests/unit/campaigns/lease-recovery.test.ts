@@ -164,3 +164,29 @@ describe("a failure has to arrive carrying its cause", () => {
     expect(dispatcher2).not.toMatch(/if \(auditError\) throw/);
   });
 });
+
+describe("re-running an attempt is not a collision", () => {
+  const dispatcher3 = read("../../../src/server/workers/dispatcher.ts");
+
+  it("reuses the agent run belonging to the same attempt", () => {
+    // The key is task and attempt and it is unique per organization, so re-running an attempt
+    // that already has a row collided — and the collision surfaced as a bare Error carrying a
+    // five-digit Postgres code, which the boundary flattened into "internal_error".
+    expect(dispatcher3).toContain('onConflict: "organization_id,idempotency_key"');
+    expect(dispatcher3).not.toMatch(/from\("agent_runs"\)\s*\.insert\(/);
+  });
+
+  it("stops throwing bare Errors from the execution path", () => {
+    // Every one of these reached the task row as "No pudimos completar la operación".
+    for (const bare of ['new Error("Assigned agent not found")', 'new Error("Autonomy policy denied execution")', "new Error(agentRunError.code)", "new Error(taskRunError.code)"]) {
+      expect(dispatcher3, bare).not.toContain(bare);
+    }
+    for (const code of ["assigned_agent_missing", "autonomy_denied", "task_run_insert_failed", "agent_run_insert_failed"]) {
+      expect(dispatcher3, code).toContain(code);
+    }
+  });
+
+  it("keeps the lease-loss retryable, since another worker may simply have won", () => {
+    expect(dispatcher3).toContain('Object.assign(new Error("Task lease was lost before completion"), { retryable: true })');
+  });
+});

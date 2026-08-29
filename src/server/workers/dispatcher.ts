@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { log } from "@/lib/logging/logger";
-import { publicError } from "@/server/errors";
+import { DomainError, publicError } from "@/server/errors";
 import { eventToTask, type PersistentEvent } from "@/server/events/handler";
 import { configuredAgentProviderName, getAgentProvider } from "@/server/agents/provider";
 import type { RuntimeTask } from "@/server/tasks/types";
@@ -67,18 +67,26 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
   const { data: agentData, error: agentError } = task.assigned_agent_id
     ? await db.from("agents").select("id,organization_id,role,display_name,autonomy_level,configuration").eq("id", task.assigned_agent_id).single()
     : { data: null, error: null };
-  if (agentError || !agentData) return finishFailure(db, task, workerId, new Error("Assigned agent not found"));
+  if (agentError || !agentData) return finishFailure(db, task, workerId, new DomainError("dependency", "El agente asignado a la tarea no existe.", "assigned_agent_missing", false));
   const agent = agentData as AgentRow;
   const { data: approved } = task.requires_approval
     ? await db.from("approvals").select("id").eq("task_id",task.id).eq("status","approved").limit(1).maybeSingle()
     : { data: null };
   if(!executionAllowed({autonomyLevel:agent.autonomy_level,riskLevel:task.risk_level,requiresApproval:task.requires_approval,hasApproval:Boolean(approved)}))
-    return finishFailure(db,task,workerId,new Error("Autonomy policy denied execution"));
+    return finishFailure(db,task,workerId,new DomainError("authorization","La politica de autonomia no permite ejecutar esta tarea.","autonomy_denied",false));
   const runKey = `task:${task.id}:attempt:${task.attempt_count}`;
   const { data: taskRun, error: taskRunError } = await db.from("task_runs").insert({ organization_id: task.organization_id, task_id: task.id, agent_id: agent.id, attempt_number: task.attempt_count, worker_id: workerId, status: "running", input: task.input, correlation_id: correlationId }).select("id").single();
-  if (taskRunError) return finishFailure(db, task, workerId, new Error(taskRunError.code));
-  const { data: agentRun, error: agentRunError } = await db.from("agent_runs").insert({ organization_id: task.organization_id, agent_id: agent.id, task_id: task.id, event_id: task.source_event_id, provider: providerName, status: "running", input: task.input, idempotency_key: runKey }).select("id").single();
-  if (agentRunError) return finishFailure(db, task, workerId, new Error(agentRunError.code), taskRun.id);
+  if (taskRunError) return finishFailure(db, task, workerId, new DomainError("dependency", `No se pudo registrar la corrida: ${taskRunError.code ?? taskRunError.message}`, "task_run_insert_failed", false));
+  // Upserted, not inserted.
+  //
+  // The key is task and attempt, and it is unique per organization, so re-running an attempt that
+  // already has a row -- after an operator requeues a task, or a duplicate dispatch -- collided
+  // and the collision was raised as a bare Error carrying a five-digit Postgres code. That is
+  // what idempotency is supposed to prevent, not cause: the same attempt reuses its own row.
+  const { data: agentRun, error: agentRunError } = await db.from("agent_runs")
+    .upsert({ organization_id: task.organization_id, agent_id: agent.id, task_id: task.id, event_id: task.source_event_id, provider: providerName, status: "running", input: task.input, idempotency_key: runKey }, { onConflict: "organization_id,idempotency_key" })
+    .select("id").single();
+  if (agentRunError) return finishFailure(db, task, workerId, new DomainError("dependency", `No se pudo registrar la corrida del agente: ${agentRunError.code ?? agentRunError.message}`, "agent_run_insert_failed", false), taskRun.id);
 
   log("info", "task.started", { organizationId: task.organization_id, taskId: task.id, agentId: agent.id, runId: agentRun.id, eventId: task.source_event_id ?? undefined, correlationId });
   try {
