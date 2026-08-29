@@ -20,11 +20,22 @@ describe("agent pipeline snapshot", () => {
     expect(emilia.currentTitle).toBeNull();
   });
 
-  it("marks a stage as working only while a task is queued or running", () => {
+  it("tells a task that is running from one that is only queued", () => {
+    // These used to be one state, and the screen said "Trabajando ahora" for both. Nothing
+    // drains the queue on its own here, so a queued task can sit indefinitely: reading that as
+    // work in progress turns "nobody pressed the button" into "this has hung", which sends the
+    // person looking for a fault instead of a button.
     expect(find([{ type: "content.copy", status: "running" }], "copy").status).toBe("working");
-    expect(find([{ type: "content.copy", status: "queued" }], "copy").status).toBe("working");
+    expect(find([{ type: "content.copy", status: "queued" }], "copy").status).toBe("queued");
     expect(find([{ type: "content.copy", status: "completed" }], "copy").status).toBe("done");
     expect(find([{ type: "content.copy", status: "cancelled" }], "copy").status).toBe("idle");
+  });
+
+  it("still counts a queued task as work the stage owns", () => {
+    // Queued is not working, but it is not nothing either: the count is what the screen shows.
+    const stage = find([{ type: "content.copy", status: "queued" }, { type: "content.copy", status: "running" }], "copy");
+    expect(stage.active).toBe(2);
+    expect(stage.status).toBe("working");
   });
 
   it("shows the real task title rather than a generic label", () => {

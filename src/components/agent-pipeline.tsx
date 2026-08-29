@@ -50,6 +50,9 @@ function plural(count: number, one: string, many: string) {
 /** The state in the words a person would use, never a bare number with no unit. */
 function stateLine(stage: PipelineStage, visual: VisualState) {
   if (visual === "working") return stage.active > 1 ? plural(stage.active, "tarea en curso", "tareas en curso") : "Trabajando ahora";
+  // Queued is not working. Saying otherwise turned "nobody pressed the button" into "this is
+  // taking a long time", which is a different problem with a different fix.
+  if (visual === "queued") return stage.active > 1 ? plural(stage.active, "tarea en cola", "tareas en cola") : "En cola";
   if (visual === "waiting") return plural(stage.active, "pieza te espera", "piezas te esperan");
   if (visual === "done") return plural(stage.completed, "tarea lista", "tareas listas");
   return "Sin trabajo";
@@ -61,6 +64,7 @@ function stateLine(stage: PipelineStage, visual: VisualState) {
  */
 function activityLine(stage: PipelineStage, visual: VisualState) {
   if (visual === "working") return { kicker: "Ahora mismo", text: stage.currentTitle ?? stage.workingLabel };
+  if (visual === "queued") return { kicker: "Esperando turno", text: stage.currentTitle ?? stage.workingLabel };
   if (visual === "waiting") return { kicker: "Te toca a vos", text: stage.currentTitle ?? "Hay piezas esperando tu decisión." };
   if (stage.lastTitle) return { kicker: "Lo último que entregó", text: stage.lastTitle };
   return { kicker: "Sin actividad", text: "Todavía no le tocó trabajar en esto." };
@@ -71,8 +75,10 @@ function focusKeyOf(snapshot: PipelineSnapshot) {
   const stages = snapshot.stages;
   const working = stages.find((stage) => visualStateOf(stage) === "working");
   const waiting = stages.find((stage) => visualStateOf(stage) === "waiting");
+  // Stalled work still deserves the eye: it is the stage a person has to do something about.
+  const queued = stages.find((stage) => visualStateOf(stage) === "queued");
   const done = [...stages].reverse().find((stage) => stage.status === "done");
-  return (working ?? waiting ?? done ?? stages[0])?.key ?? null;
+  return (working ?? waiting ?? queued ?? done ?? stages[0])?.key ?? null;
 }
 
 function Stage({ stage, selected, onSelect }: { stage: PipelineStage; selected: boolean; onSelect: () => void }) {

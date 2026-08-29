@@ -194,3 +194,26 @@ describe("re-running an attempt is not a collision", () => {
     expect(dispatcher3).toContain('Object.assign(new Error("Task lease was lost before completion"), { retryable: true })');
   });
 });
+
+describe("the screen does not claim work is happening", () => {
+  const pipeline = read("../../../src/server/content-factory/pipeline.ts");
+  const view = read("../../../src/components/agent-pipeline.tsx");
+
+  it("separates a task that is running from one that is merely queued", () => {
+    // They were the same state, so a queued task made a stage announce "Trabajando ahora" — and
+    // a campaign nobody had started read as a campaign that had hung.
+    expect(pipeline).toContain('"idle" | "queued" | "working" | "done"');
+    expect(pipeline).toContain('task.status === "running"');
+    expect(pipeline).toMatch(/inFlight \? "working" : active\.length \? "queued"/);
+  });
+
+  it("says queued in words, not as a kind of working", () => {
+    expect(view).toContain('visual === "queued"');
+    expect(view).toContain("En cola");
+    expect(view).toContain("Esperando turno");
+  });
+
+  it("still points the eye at stalled work", () => {
+    expect(view).toMatch(/working \?\? waiting \?\? queued \?\? done/);
+  });
+});

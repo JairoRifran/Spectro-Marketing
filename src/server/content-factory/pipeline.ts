@@ -1,12 +1,18 @@
 // The agent pipeline as a read model. It answers one question a person actually asks —
 // "where is my work right now, and who has it?" — from the same task rows the runtime writes.
 //
-// Nothing here invents activity. A stage is only "working" when a task for it is genuinely
-// queued or running; when nothing is happening every stage reads idle, which is the honest
-// state while AUTOMATION_ENABLED is false and no one has pressed anything.
+// Nothing here invents activity. A stage is "working" only when one of its tasks is actually
+// running, and "queued" when work is waiting for someone to press the button; when nothing is
+// happening every stage reads idle, which is the honest state while AUTOMATION_ENABLED is false.
+//
+// Those first two used to be the same state. A queued task made a stage announce "Trabajando
+// ahora", so a campaign that had stopped looked like a campaign in progress -- and the obvious
+// reading of a stage that says it is working for five minutes is that it hung, when in fact
+// nobody had started it. With nothing driving the queue on its own, the difference between
+// waiting to run and running is the whole question a person is asking of this screen.
 
 export type PipelinePhase = "strategy" | "content";
-export type StageStatus = "idle" | "working" | "done";
+export type StageStatus = "idle" | "queued" | "working" | "done";
 
 export interface StageDefinition {
   key: string;
@@ -91,13 +97,14 @@ export function buildPipeline(tasks: TaskRow[], waitingApproval: number, now: st
     }
     const rows = tasks.filter((task) => task.type === definition.taskType);
     const active = rows.filter((task) => ACTIVE_STATUSES.includes(task.status));
+    const inFlight = rows.filter((task) => task.status === "running").length;
     const completed = rows.filter((task) => task.status === "completed").length;
     const failed = rows.filter((task) => task.status === "failed").length;
     const running = active.find((task) => task.status === "running") ?? active[0];
     const latest = [...rows].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))[0];
     return {
       ...definition,
-      status: active.length ? "working" : completed > 0 ? "done" : "idle",
+      status: inFlight ? "working" : active.length ? "queued" : completed > 0 ? "done" : "idle",
       active: active.length,
       completed,
       failed,
