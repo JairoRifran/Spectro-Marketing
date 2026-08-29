@@ -8,7 +8,19 @@ import { validateBrandGuardrails } from "./guardrails";
 
 type AgentRef={id:string;role:string};
 const fail=(message:string):never=>{throw new DomainError("validation",message,"campaign_output_invalid",false);};
-async function checked(query:PromiseLike<{error:{code?:string;message?:string}|null}>){const{error}=await query;if(error)throw new Error(`Campaign persistence failed: ${error.code??error.message}`);}
+// A persistence failure has to arrive carrying its cause.
+//
+// This threw a plain Error, and publicError turns anything that is not a DomainError into
+// "internal_error / No pudimos completar la operacion" before it reaches the task row. The
+// database said exactly what was wrong -- a constraint, a type, a missing column -- and the
+// boundary replaced it with a sentence that fits every failure and identifies none. Diagnosing a
+// production failure then costs a deploy per hypothesis.
+//
+// It is not retryable: a row the database refuses once it refuses again.
+async function checked(query:PromiseLike<{error:{code?:string;message?:string}|null}>){
+  const{error}=await query;
+  if(error)throw new DomainError("dependency",`No se pudo guardar el resultado de la campana: ${error.code??"sin codigo"} ${error.message??""}`.trim(),"campaign_persist_failed",false);
+}
 
 export async function persistCampaignOutcome(db:SupabaseClient,task:RuntimeTask,result:AgentResult,agent:AgentRef){
   if(!task.campaign_id||!task.type.startsWith("campaign."))return;

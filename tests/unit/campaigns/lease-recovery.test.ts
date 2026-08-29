@@ -129,3 +129,38 @@ describe("a stage waiting out its backoff is not a failure", () => {
     expect(draft).toContain('effort: "high"');
   });
 });
+
+describe("a failure has to arrive carrying its cause", () => {
+  const campaigns = read("../../../src/server/campaigns/outcomes.ts");
+  const content = read("../../../src/server/content-factory/outcomes.ts");
+  const dispatcher2 = read("../../../src/server/workers/dispatcher.ts");
+
+  it("does not throw a bare Error the boundary will flatten", () => {
+    // publicError turns anything that is not a DomainError into "internal_error / No pudimos
+    // completar la operación", so the database's own reason never reaches the task row and
+    // diagnosing a production failure costs a deploy per hypothesis.
+    expect(campaigns).not.toMatch(/throw new Error\(`Campaign persistence failed/);
+    expect(content).not.toMatch(/throw new Error\(`Content persistence failed/);
+    expect(campaigns).toContain("campaign_persist_failed");
+    expect(content).toContain("content_persist_failed");
+  });
+
+  it("keeps the database code in the message", () => {
+    for (const [name, source] of [["campaigns", campaigns], ["content", content]] as const) {
+      expect(source, name).toMatch(/error\.code\s*\?\?\s*"sin codigo"/);
+    }
+  });
+
+  it("never reports a persistence refusal as retryable", () => {
+    // A row the database refuses once it refuses again; retrying only spends the attempts.
+    expect(campaigns).toMatch(/"campaign_persist_failed",\s*false/);
+    expect(content).toMatch(/"content_persist_failed",\s*false/);
+  });
+
+  it("notices when the audit write itself fails", () => {
+    // It was fired and forgotten: a task reached `failed` while the activity log stayed silent.
+    expect(dispatcher2).toContain("task.audit_write_failed");
+    // Reporting the failure must not be replaced by a failure to report it.
+    expect(dispatcher2).not.toMatch(/if \(auditError\) throw/);
+  });
+});

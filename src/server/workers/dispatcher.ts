@@ -119,7 +119,13 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
   const details = publicError(error);
   if (taskRunId) await db.from("task_runs").update({ status: "failed", error: details, completed_at: new Date().toISOString() }).eq("id", taskRunId);
   await db.from("tasks").update(decision.retry ? { status: "queued", scheduled_for: new Date(Date.now() + decision.delayMs).toISOString(), error: details, locked_at: null, locked_by: null, lease_expires_at: null } : { status: "failed", error: details }).eq("id", task.id).eq("locked_by", workerId);
-  await db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: decision.delayMs } });
+  // Checked, unlike before. This insert is the only record a failed task leaves in the audit
+  // trail, and it was fired and forgotten: a task went to `failed` in the tasks table while the
+  // activity log stayed silent, which is the one moment the audit trail is actually being read.
+  // It must not throw -- that would replace the failure being reported with a failure to report
+  // it -- so it is logged instead.
+  const { error: auditError } = await db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: decision.delayMs } });
+  if (auditError) log("error", "task.audit_write_failed", { taskId: task.id }, { code: auditError.code, message: auditError.message });
   return decision.retry ? "retried" : "failed";
 }
 

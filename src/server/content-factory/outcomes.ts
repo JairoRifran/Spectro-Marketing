@@ -22,9 +22,12 @@ const fail = (message: string): never => {
   throw new DomainError("validation", message, "content_output_invalid", false);
 };
 
+/** Carries the database's own reason forward; see the note in campaigns/outcomes.ts. */
 async function checked(query: PromiseLike<{ error: { code?: string; message?: string } | null }>) {
   const { error } = await query;
-  if (error) throw new Error(`Content persistence failed: ${error.code ?? error.message}`);
+  if (error) {
+    throw new DomainError("dependency", `No se pudo guardar el contenido: ${error.code ?? "sin codigo"} ${error.message ?? ""}`.trim(), "content_persist_failed", false);
+  }
 }
 
 async function activity(
