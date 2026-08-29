@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { canvasFor, contentBox } from "@/server/media/canvas";
 import { composeFrames } from "@/server/media/compose";
@@ -281,5 +282,26 @@ describe("canvas follows the produced format", () => {
         }
       }
     }
+  });
+});
+
+describe("a text post previews with what it will carry", () => {
+  const mockup = readFileSync(new URL("../../../src/components/platform-mockup.tsx", import.meta.url), "utf8");
+
+  it("hands the text renderer the composed frame", () => {
+    // It used to take only the variant and the account, so there was nowhere for a picture to
+    // appear even once one had been generated.
+    expect(mockup).toContain("function TextPost({ variant, account, frames, identity, images }: Renderable)");
+    expect(mockup).toContain('{shape === "text" && <TextPost {...props} />}');
+  });
+
+  it("puts it under the words, where the platform attaches one", () => {
+    const start = mockup.indexOf("function TextPost");
+    const post = mockup.slice(start, mockup.indexOf("export function PlatformMockup"));
+    expect(post.indexOf("<Caption")).toBeLessThan(post.indexOf("<Media"));
+  });
+
+  it("still previews a piece whose picture does not exist", () => {
+    expect(mockup).toContain("{frames[0] && (");
   });
 });

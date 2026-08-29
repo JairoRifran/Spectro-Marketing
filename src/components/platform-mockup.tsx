@@ -22,9 +22,9 @@ import type { BrandIdentity } from "@/server/media/identity";
 // affordances are drawn because they change how copy reads — a caption is truncated in a feed,
 // a vertical video hides text behind the action rail — the counts are not.
 //
-// The imagery does not exist yet either: nothing generates pictures at this stage. Rather than
-// fake a photo, the media area shows the direction written for whoever produces it, which is
-// the honest content of that rectangle today.
+// The media area shows the frame composition actually produced, with the generated picture in
+// it when one exists. When none does it says so rather than faking a photo — an empty rectangle
+// that admits it is empty is worth more here than a stock image nobody chose.
 
 function initials(name: string) {
   return name.replace(/[^\p{L}\p{N} ]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "SP";
@@ -35,12 +35,8 @@ function Avatar({ account }: { account: MockAccount }) {
 }
 
 /**
- * The media rectangle. There is no picture to show, so it carries the direction that will be
- * handed to whatever produces one, plus any text meant to be burned into the frame.
- */
-/**
- * The media rectangle. It used to be a placeholder; it now holds the frame that composition
- * actually produced, at the delivery proportions it will be exported at.
+ * The media rectangle. It holds the frame composition produced, at the delivery proportions it
+ * will be exported at, and falls back to naming its own absence when there is no frame.
  */
 function Media({ frame, identity, images, children }: { frame?: FrameSpec; identity: BrandIdentity; images?: Record<string, string>; children?: ReactNode }) {
   if (frame) {
@@ -246,7 +242,7 @@ function StaticPost({ variant, account, frames, identity, images }: Renderable) 
 }
 
 /** A text post in a professional feed: LinkedIn, or Facebook without an image. */
-function TextPost({ variant, account }: { variant: PlatformContentVariant; account: MockAccount }) {
+function TextPost({ variant, account, frames, identity, images }: Renderable) {
   const post = variant.detail.shape === "text" ? variant.detail.post : null;
   if (!post) return null;
   const body = [post.hook, post.body, post.cta].filter(Boolean).join("\n\n");
@@ -258,6 +254,14 @@ function TextPost({ variant, account }: { variant: PlatformContentVariant; accou
         <MoreHorizontal size={16} aria-hidden="true" />
       </header>
       <Caption text={body} limit={210} />
+      {/* Under the words, which is where the platform puts an attached image. The post reads the
+          same without it — this accompanies the text rather than carrying it — so a piece whose
+          picture has not been generated yet still previews correctly. */}
+      {frames[0] && (
+        <Media frame={frames[0]} identity={identity} images={images}>
+          <h4 className="mock-slide-headline">{post.hook}</h4>
+        </Media>
+      )}
       {post.sources.length > 0 && <p className="mock-sources">Fuentes citadas: {post.sources.join(" · ")}</p>}
       <div className="mock-actions is-labelled" aria-hidden="true">
         <span><ThumbsUp size={15} /> Recomendar</span>
@@ -292,7 +296,7 @@ export function PlatformMockup({ variant, account, frames, identity, images = {}
       {shape === "story" && <StorySequence {...props} />}
       {shape === "carousel" && <Carousel {...props} />}
       {shape === "static" && <StaticPost {...props} />}
-      {shape === "text" && <TextPost variant={variant} account={account} />}
+      {shape === "text" && <TextPost {...props} />}
       <FrameExport variant={variant} frames={frames} identity={identity} images={images} title={title ?? variant.format} audio={audio} />
       <p className="mock-disclaimer">
         Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance porque
