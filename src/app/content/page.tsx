@@ -132,11 +132,14 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
 
                       return (
                         <>
-                          <PlatformTag variant={variant} />
-
                           {/* One view per card. The simulation and the assembled playback drew
                               the same frame twice, which made every card twice as tall as it
                               needed to be and said nothing the other had not. */}
+                          {/* The static mockup prints its own platform tag; the assembled
+                              playback does not, so it gets one here. Printing both produced the
+                              label twice on every card that was not playable. */}
+                          {playable && <PlatformTag variant={variant} />}
+
                           {playable ? (
                             <AssembledPreview
                               frames={frames}
@@ -162,14 +165,15 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                             />
                           )}
 
-                          {/* The honesty note travels with the card, not with one of the two
-                              views it used to live in. Losing it when the views merged would
-                              have quietly removed the only thing on screen saying these are
-                              simulations. */}
-                          <p className="mock-disclaimer">
-                            Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance
-                            porque nada se publicó todavía; cualquier número acá sería inventado.
-                          </p>
+                          {/* The assembled playback has no honesty note of its own, so the card
+                              carries one for it. The static mockup already prints its own, and
+                              printing a second identical paragraph underneath said nothing twice. */}
+                          {playable && (
+                            <p className="mock-disclaimer">
+                              Simulación para revisar cómo se lee la pieza. No hay conteos de likes, vistas ni alcance
+                              porque nada se publicó todavía; cualquier número acá sería inventado.
+                            </p>
+                          )}
 
                           {/* What exists and what does not, in one place and actionable. */}
                           <div className="gallery-state">

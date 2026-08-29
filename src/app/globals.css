@@ -208,7 +208,10 @@
   linear-gradient(155deg,var(--net-soft),#eef2f0);
   border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .mock-media-note{position:absolute;left:0;right:0;bottom:11px;text-align:center;color:#93a09c;font-size:8px;letter-spacing:.12em;text-transform:uppercase}
-.mock-post.is-text .mock-media{display:none}
+/* A text post's media box was hidden because it never had anything in it. It does now: the
+   frame composed to accompany the post, with the generated picture when there is one. Hiding it
+   made the whole feature invisible while the element sat in the DOM, correct and unrendered. */
+.mock-post.is-text .mock-media{margin-top:10px;border-radius:8px;overflow:hidden}
 .mock-slide-kind{position:absolute;top:11px;left:14px;color:#7c8a86;font-size:8px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}
 .mock-slide-count{position:absolute;top:10px;right:12px;padding:2px 8px;border-radius:99px;background:rgba(16,43,42,.72);color:#fff;font-size:9px;font-weight:650}
 .mock-slide-headline{margin:0;font-size:17px;line-height:1.28;letter-spacing:-.02em;color:#12211f}

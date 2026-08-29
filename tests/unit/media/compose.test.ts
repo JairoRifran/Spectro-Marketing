@@ -305,3 +305,24 @@ describe("a text post previews with what it will carry", () => {
     expect(mockup).toContain("{frames[0] && (");
   });
 });
+
+describe("the picture is not hidden by the stylesheet that predates it", () => {
+  const css = readFileSync(new URL("../../../src/app/globals.css", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../../../src/app/content/page.tsx", import.meta.url), "utf8");
+
+  it("stops hiding the media box on a text post", () => {
+    // It was hidden because it never had anything in it. The element was in the DOM, correct
+    // and unrendered, which is the hardest kind of missing feature to see.
+    expect(css).not.toContain(".mock-post.is-text .mock-media{display:none}");
+  });
+
+  it("prints the platform tag once", () => {
+    // The static mockup prints its own; the card printed a second one over it.
+    expect(page).toContain("{playable && <PlatformTag variant={variant} />}");
+  });
+
+  it("prints the honesty note once", () => {
+    // Only the assembled playback lacks one of its own.
+    expect(page).toContain("{playable && (\n                            <p className=\"mock-disclaimer\">");
+  });
+});
