@@ -90,7 +90,9 @@ export async function getContentList(filters: ContentFilters) {
   if (!ctx) {
     // Demo has to honour the same filters as live, or the filter bar reads as broken.
     const items = isDemoMode ? applyDemoFilters(demoListItems(), filters) : [];
-    return { mode: (isDemoMode ? "demo" : "live") as "demo" | "live", orgName: isDemoMode ? "Northstar Urban" : "Sin organización", items, total: items.length, page: 1, pageSize: CONTENT_PAGE_SIZE, campaigns: (isDemoMode ? [{ id: DEMO_CAMPAIGN.id, name: DEMO_CAMPAIGN.name }] : []) as CampaignJoin[] };
+    // The role travels with the list because the gallery decides pieces in place, and a viewer
+    // must not be shown controls that would be refused.
+    return { mode: (isDemoMode ? "demo" : "live") as "demo" | "live", role: "owner" as const, orgName: isDemoMode ? "Northstar Urban" : "Sin organización", items, total: items.length, page: 1, pageSize: CONTENT_PAGE_SIZE, campaigns: (isDemoMode ? [{ id: DEMO_CAMPAIGN.id, name: DEMO_CAMPAIGN.name }] : []) as CampaignJoin[] };
   }
 
   const page = Math.max(1, Number(filters.page) || 1);
@@ -128,7 +130,7 @@ export async function getContentList(filters: ContentFilters) {
   });
 
   const filtered = filters.agent ? items.filter((item) => item.agentName === filters.agent) : items;
-  return { mode: "live" as const, orgName: ctx.orgName, items: filtered, total: count ?? filtered.length, page, pageSize: CONTENT_PAGE_SIZE, campaigns: (campaigns ?? []) as CampaignJoin[] };
+  return { mode: "live" as const, role: ctx.role, orgName: ctx.orgName, items: filtered, total: count ?? filtered.length, page, pageSize: CONTENT_PAGE_SIZE, campaigns: (campaigns ?? []) as CampaignJoin[] };
 }
 
 

@@ -150,9 +150,15 @@ describe("composition", () => {
     expect(cover!.blocks.some((block) => block.kind === "text" && block.lines.join(" ").length > 0)).toBe(true);
   });
 
-  it("composes nothing for a text post, rather than inventing a graphic format", () => {
-    // LinkedIn text is words in a feed. A designed surface there would be a format nobody uses.
-    expect(composeFrames(variantFor("linkedin", "text_post"))).toEqual([]);
+  it("composes one spare frame to accompany a text post, not to replace it", () => {
+    // The earlier rule was that a designed surface here invents a format nobody uses. That was
+    // half right: the words are still the piece, but a text post can carry an image beside them,
+    // and a wall of unbroken text is what a feed scrolls past. One frame, and only one.
+    const frames = composeFrames(variantFor("linkedin", "text_post"));
+    expect(frames).toHaveLength(1);
+    expect(frames[0]!.key).toBe("post");
+    // An image slot is the whole point: without a frame there was nowhere to put a picture.
+    expect(frames[0]!.blocks.some((block) => block.kind === "image")).toBe(true);
   });
 
   // Text stays inside the safe area, because outside it the platform's own interface sits on

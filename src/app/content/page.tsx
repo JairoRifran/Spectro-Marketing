@@ -8,6 +8,7 @@ import { accountFor } from "@/features/content/account";
 import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { AssembledPreview } from "@/components/assembled-preview";
+import { ContentActions } from "@/components/content-actions";
 import { intendedTimings } from "@/server/media/timing";
 import { buildNarration } from "@/server/media/narration";
 import { buildMusicBrief } from "@/server/media/soundtrack";
@@ -212,6 +213,22 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                               />
                             )}
                           </div>
+
+                          {/* The decision belongs where the piece is actually judged.
+                              Seeing a piece as it will look and then having to leave for a
+                              different screen to say yes or no puts the two halves of one
+                              judgement in two places, and the half that carries the evidence
+                              is this one. */}
+                          {(item.status === "waiting_approval" || item.status === "needs_revision") && (
+                            <div className="gallery-decision">
+                              <ContentActions
+                                id={item.id}
+                                demo={data.mode === "demo"}
+                                canDecide={data.role !== "viewer"}
+                                revisionOnly={item.status === "needs_revision"}
+                              />
+                            </div>
+                          )}
                         </>
                       );
                     })() : <p className="panel-empty">Planificada, todavía sin escribir.</p>}

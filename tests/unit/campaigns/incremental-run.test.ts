@@ -177,3 +177,24 @@ describe("a run that was started keeps going without being pressed again", () =>
     expect(page).toContain("contentPending?<ContentGenerateButton");
   });
 });
+
+describe("a piece can be judged where it is seen", () => {
+  const contentPage = read("../../../src/app/content/page.tsx");
+  const compose = read("../../../src/server/media/compose.ts");
+
+  it("offers the decision on the card that shows the piece", () => {
+    // Seeing a piece as it will look and then leaving for another screen to say yes or no puts
+    // the two halves of one judgement in two places, and this is the half carrying the evidence.
+    expect(contentPage).toContain("<ContentActions");
+    expect(contentPage).toContain('item.status === "waiting_approval"');
+    expect(contentPage).toContain('canDecide={data.role !== "viewer"}');
+  });
+
+  it("composes something for a text post to carry", () => {
+    // Its words are still the piece; this accompanies them. A wall of unbroken text is what a
+    // feed scrolls past.
+    expect(compose).toContain('detail.shape === "text"');
+    expect(compose).toContain("Acompaña al post");
+    expect(compose).not.toContain("A text post has no designed surface");
+  });
+});

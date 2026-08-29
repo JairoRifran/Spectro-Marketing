@@ -245,7 +245,20 @@ export function composeFrames(variant: PlatformContentVariant, identity: BrandId
     })];
   }
 
-  // A text post has no designed surface: the words are the piece. Composing a graphic for it
-  // would be inventing a format the platform does not use.
+  if (detail.shape === "text") {
+    // A text post's words are still the piece -- this is not a graphic that replaces them.
+    //
+    // The earlier reading was that composing anything here invents a format the platform does
+    // not use, and that is wrong in one direction: a text post can carry an image alongside it,
+    // and a wall of unbroken text is what a feed scrolls past. So the frame is deliberately
+    // spare -- the hook, and the call to action under it -- because it accompanies the post
+    // rather than restating it. Whoever publishes can attach it or ignore it.
+    return [frame("post", "Acompaña al post", canvas, identity, true, (cursor, box, ink, accent) => {
+      eyebrow(cursor, "Acompaña al post", box, accent);
+      heading(cursor, detail.post.hook, box, ink, 6);
+      paragraph(cursor, detail.post.cta, box, ink, 2);
+    })];
+  }
+
   return [];
 }

@@ -392,4 +392,7 @@
 
 .gallery-state{margin-top:14px;padding-top:12px;border-top:1px solid #eef1f0;display:grid;gap:8px}
 .gallery-state .voiceover-compact{margin-top:0}
+/* The decision sits under the piece it is about, separated so it reads as a different kind of act than generating media. */
+.gallery-decision{margin-top:12px;padding-top:12px;border-top:1px solid #eef1f0}
+.gallery-decision .panel-empty{margin:0}
 .image-done{display:flex;align-items:center;gap:9px}
