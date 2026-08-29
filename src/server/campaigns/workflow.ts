@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runManualCampaignTasks } from "@/server/workers/dispatcher";
+import { pendingCampaignWork, runManualCampaignTasks } from "@/server/workers/dispatcher";
 import { configuredAgentProviderName } from "@/server/agents/provider";
 import { DomainError } from "@/server/errors";
 
@@ -28,19 +28,8 @@ const BUDGET_MS = 45_000;
  */
 const LEASE_SECONDS = 75;
 
-/**
- * What the chain still owes, and when it can next be picked up.
- *
- * The second half is what lets the screen wait by itself. A stage that ran long is queued again
- * a few seconds later, and without knowing when, the caller either hammers the endpoint or gives
- * up and asks a person to press a button -- for a condition that resolves on its own.
- */
-async function pending(db: ReturnType<typeof createAdminClient>, campaignId: string) {
-  const { data } = await db.from("tasks").select("scheduled_for").eq("campaign_id", campaignId).in("status", ["queued", "running"]);
-  const rows = data ?? [];
-  const times = rows.map((row) => (row.scheduled_for ? Date.parse(row.scheduled_for) : 0)).filter((value) => Number.isFinite(value));
-  return { count: rows.length, nextAttemptAt: times.length ? new Date(Math.min(...times)).toISOString() : null };
-}
+/** Delegated to the shared helper so both manual paths answer this the same way. */
+const pending=(db:ReturnType<typeof createAdminClient>,campaignId:string)=>pendingCampaignWork(db,campaignId);
 
 export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string){
   const db=createAdminClient();

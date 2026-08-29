@@ -69,9 +69,10 @@ describe("an unfinished chain is not a failed one", () => {
   it("reports whether work remains, and when it can next be picked up", () => {
     // The second half is what lets the screen wait by itself instead of asking a person to
     // press the same button again.
-    expect(workflow).toMatch(/async function pending\(/);
+    expect(workflow).toContain("pendingCampaignWork");
     expect(workflow).toContain("nextAttemptAt");
-    expect(workflow).toMatch(/\.in\("status",\s*\["queued",\s*"running"\]\)/);
+    // The query itself lives in the shared helper, so both manual paths answer this the same way.
+    expect(dispatcher).toMatch(/\.in\(\["queued", "running"\]\)|\.in\("status", \["queued", "running"\]\)/);
   });
 
   it("continues a chain instead of starting a second one", () => {
@@ -98,5 +99,36 @@ describe("the screen keeps asking until it is done", () => {
     // with a hang is press the button again.
     expect(button).toContain("STAGES");
     expect(button.match(/const STAGES = \[(.*)\]/)?.[1].split(",").length).toBe(5);
+  });
+});
+
+describe("the content factory runs a piece at a time too", () => {
+  const contentWorkflow = read("../../../src/server/content-factory/workflow.ts");
+  const contentRoute = read("../../../src/app/api/campaigns/[id]/content/route.ts");
+  const contentButton = read("../../../src/components/content-actions.tsx");
+
+  it("stops attempting the whole batch in one request", () => {
+    // A plan step plus a copy and a review per piece is twenty-nine steps. That was invisible
+    // while each returned in milliseconds and is twenty-five paid calls once a model answers,
+    // most of them killed halfway through a function that stops at sixty seconds.
+    expect(contentWorkflow).toContain("stepsPerCall");
+    expect(contentWorkflow).toContain("budgetMs: BUDGET_MS");
+    expect(contentWorkflow).not.toMatch(/maxSteps: 1 \+ MAX_PIECES_PER_RUN \* 2 \+ 4, leaseSeconds: 120/);
+  });
+
+  it("declares a duration at all", () => {
+    // The route had none, so the platform's shortest default applied to the longest work.
+    expect(contentRoute).toContain("maxDuration = 60");
+  });
+
+  it("continues a run instead of planning a second batch", () => {
+    expect(contentWorkflow).toContain("resumeContentFactoryForCampaign");
+    expect(contentRoute).toContain("resumeContentFactoryForCampaign");
+  });
+
+  it("waits for a piece that ran long rather than reporting a fault", () => {
+    expect(contentButton).toContain("result.nextAttemptAt");
+    expect(contentButton).toContain("MAX_CALLS");
+    expect(contentButton).toContain("MAX_WAIT_MS");
   });
 });

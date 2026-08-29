@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runManualCampaignTasks } from "@/server/workers/dispatcher";
+import { pendingCampaignWork, runManualCampaignTasks } from "@/server/workers/dispatcher";
+import { configuredAgentProviderName } from "@/server/agents/provider";
 import { DomainError } from "@/server/errors";
 import type { BrandContext } from "@/server/content/schemas/brief";
 import type { CampaignObjective } from "@/server/content/ctas";
@@ -13,6 +14,22 @@ import type { CampaignChannel, PillarWeight } from "./planning";
 
 /** Upper bound on pieces produced by one run, so a long campaign cannot create an unbounded plan. */
 export const MAX_PIECES_PER_RUN = 12;
+
+// How much of the factory runs in one HTTP request.
+//
+// It used to be all of it: one plan step plus a copy and a review per piece, twenty-nine steps
+// in a single call, written when every step returned in milliseconds. A model answering turns
+// that into twenty-five paid calls attempted inside a function that stops at sixty seconds --
+// most of them killed halfway, each one charged for.
+//
+// So a model claims one step per request and the caller asks again. The plan step stays
+// deterministic and costs nothing, but it is not worth a special case.
+const stepsPerCall = () => (configuredAgentProviderName() === "mock" ? 1 + MAX_PIECES_PER_RUN * 2 + 4 : 1);
+/** Leaves room inside the platform's limit for the reads and the response after the last step. */
+const BUDGET_MS = 45_000;
+const LEASE_SECONDS = 75;
+/** Matches the runtime's own bound, so a step is re-asked rather than handed to a person. */
+const STAGE_ATTEMPTS = 6;
 
 const OBJECTIVE_BY_GOAL: Record<string, CampaignObjective> = {
   awareness: "awareness",
@@ -122,6 +139,7 @@ export async function runContentFactoryForCampaign(organizationId: string, campa
       expected_impact: "Crear conceptos y piezas para revisión, sin publicar ni gastar",
       risk_level: "low",
       requires_approval: false,
+      max_attempts: STAGE_ATTEMPTS,
       scheduled_for: new Date().toISOString(),
       idempotency_key: `content:${campaignId}:plan:${version}:${Date.now()}`,
       input,
@@ -144,13 +162,32 @@ export async function runContentFactoryForCampaign(organizationId: string, campa
     metadata: { strategy_version: version, automation_enabled: false, max_pieces: MAX_PIECES_PER_RUN },
   });
 
-  // One plan step, then a copy and a review step per piece, plus headroom for retries.
-  const report = await runManualCampaignTasks({ campaignId, maxSteps: 1 + MAX_PIECES_PER_RUN * 2 + 4, leaseSeconds: 120 });
+  const report = await runManualCampaignTasks({ campaignId, maxSteps: stepsPerCall(), leaseSeconds: LEASE_SECONDS, budgetMs: BUDGET_MS });
 
   const { count: items } = await db
     .from("content_items")
     .select("id", { count: "exact", head: true })
     .eq("campaign_id", campaignId);
 
-  return { taskId: task.id, report, items: items ?? 0 };
+  const left = await pendingCampaignWork(db, campaignId);
+  return { taskId: task.id, report, items: items ?? 0, done: left.count === 0, nextAttemptAt: left.nextAttemptAt };
+}
+
+/**
+ * Continue a factory run already under way.
+ *
+ * Separate from starting one for the same reason the campaign paths are: starting refuses while
+ * tasks are queued, and continuing is only meaningful when they are. One entry point doing both
+ * would let a second press plan a second batch of pieces.
+ */
+export async function resumeContentFactoryForCampaign(organizationId: string, campaignId: string) {
+  const db = createAdminClient();
+  const { data: campaign, error } = await db
+    .from("campaigns").select("id").eq("id", campaignId).eq("organization_id", organizationId).single();
+  if (error || !campaign) throw new DomainError("authorization", "Campaign unavailable.", "campaign_not_found", false);
+
+  const report = await runManualCampaignTasks({ campaignId, maxSteps: stepsPerCall(), leaseSeconds: LEASE_SECONDS, budgetMs: BUDGET_MS });
+  const { count: items } = await db.from("content_items").select("id", { count: "exact", head: true }).eq("campaign_id", campaignId);
+  const left = await pendingCampaignWork(db, campaignId);
+  return { taskId: null, report, items: items ?? 0, done: left.count === 0, nextAttemptAt: left.nextAttemptAt };
 }

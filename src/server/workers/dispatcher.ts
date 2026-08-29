@@ -175,6 +175,21 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
  * Stopping before the budget is spent is what makes this resumable: the next call claims the
  * next task and continues, because nothing about the chain lives in this function's memory.
  */
+/**
+ * What a campaign still owes, and when it can next be picked up.
+ *
+ * Shared by both manual paths. The second half is what lets a screen wait by itself: a step that
+ * ran long is queued again seconds later, and without knowing when, the caller either hammers
+ * the endpoint or gives up and asks a person to press a button for a condition that resolves on
+ * its own.
+ */
+export async function pendingCampaignWork(db: SupabaseClient, campaignId: string) {
+  const { data } = await db.from("tasks").select("scheduled_for").eq("campaign_id", campaignId).in("status", ["queued", "running"]);
+  const rows = data ?? [];
+  const times = rows.map((row) => (row.scheduled_for ? Date.parse(row.scheduled_for) : 0)).filter(Number.isFinite);
+  return { count: rows.length, nextAttemptAt: times.length ? new Date(Math.min(...times)).toISOString() : null };
+}
+
 export async function runManualCampaignTasks(options:{campaignId:string;maxSteps:number;leaseSeconds:number;budgetMs?:number}):Promise<ManualCampaignReport>{
   const db=createAdminClient();const workerId=`manual-campaign:${options.campaignId}:${crypto.randomUUID()}`;
   const report:ManualCampaignReport={workerId,claimed:0,completed:0,retried:0,failed:0,exhausted:false};

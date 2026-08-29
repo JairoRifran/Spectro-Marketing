@@ -64,17 +64,35 @@ export function ContentActions({ id, demo, canDecide, revisionOnly = false }: { 
   );
 }
 
+/** Bounded on both ends: a loop that never gives up is a loop that spends money all night. */
+const MAX_CALLS = 60;
+const MAX_WAIT_MS = 30_000;
+
 export function ContentGenerateButton({ campaignId, demo }: { campaignId: string; demo: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
 
+  // Same loop the campaign button runs, for the same reason: the endpoint advances one piece at
+  // a time and says whether work remains, and a piece that ran long is queued again seconds
+  // later. Waiting here is what keeps our sixty-second ceiling from becoming something the user
+  // has to manage by pressing.
   async function run() {
     if (demo) { router.refresh(); return; }
     setState("running");
-    const response = await fetch(`/api/campaigns/${campaignId}/content`, { method: "POST" });
-    if (!response.ok) { setState("error"); return; }
-    router.refresh();
-    setState("idle");
+
+    for (let call = 0; call < MAX_CALLS; call += 1) {
+      const response = await fetch(`/api/campaigns/${campaignId}/content`, { method: "POST" });
+      if (!response.ok) { setState("error"); return; }
+      const result = (await response.json()) as { done?: boolean; nextAttemptAt?: string | null; report?: { claimed?: number } };
+      router.refresh();
+      if (result.done) { setState("idle"); return; }
+      if (result.report?.claimed === 0) {
+        const dueIn = result.nextAttemptAt ? Date.parse(result.nextAttemptAt) - Date.now() : 5_000;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(dueIn, 1_000), MAX_WAIT_MS)));
+      }
+    }
+
+    setState("error");
   }
 
   return (

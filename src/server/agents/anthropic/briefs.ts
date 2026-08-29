@@ -162,7 +162,12 @@ export const BRIEFS: Record<string, Brief> = {
     role: "copywriter",
     promptVersion: CONTENT_PROMPTS.contentCopy.version,
     schema: contentCopyOutputSchema,
-    effort: "high",
+    // Lowered from high before it has failed. Every campaign stage above low missed the
+    // deadline, and this schema is the largest of them all -- a full native variant with its
+    // slides or its script. Unlike those, this one is a single focused piece of writing rather
+    // than a wide survey, so medium is the trade: enough thought for a hook that lands, not so
+    // much that the piece is never delivered. The automatic retry covers the occasional overrun.
+    effort: "medium",
     system: role(
       "Sos quien escribe. Escribís una pieza para una plataforma concreta, en el formato nativo de esa plataforma.",
       "Recibís el brief y el concepto como JSON. La plataforma y el formato ya están decididos: no son tuyos para cambiar.",
