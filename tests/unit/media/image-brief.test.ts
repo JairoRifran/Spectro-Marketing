@@ -180,3 +180,25 @@ describe("replacing a picture", () => {
     expect(screen).toMatch(/Rehacer/);
   });
 });
+
+describe("a written scene beats the campaign's own vocabulary", () => {
+  const withDirection = { ...carousel, visualDirection: "Dos personas revisando un tablero de tareas en una oficina chica" } as typeof carousel;
+
+  it("uses the piece's visual direction when the frame has no note of its own", () => {
+    // A text post has no per-frame note, and its only other subject was the pillar and angle —
+    // an internal taxonomy nobody can photograph. That is how a post about marketing process
+    // came back illustrated with a jungle waterfall.
+    const prompt = buildImageRequest(withDirection, "slide-9", context)!.prompt;
+    expect(prompt).toContain("tablero de tareas");
+  });
+
+  it("drops the theme once a scene exists, but keeps who it is for", () => {
+    const prompt = buildImageRequest(withDirection, "slide-9", context)!.prompt;
+    expect(prompt).not.toContain("Tema:");
+    expect(prompt).toContain("PyME B2B");
+  });
+
+  it("still falls back to the theme when nothing describes a scene", () => {
+    expect(buildImageRequest(carousel, "slide-0", context)!.prompt).toContain("Tema:");
+  });
+});

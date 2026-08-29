@@ -67,6 +67,13 @@ function sceneNote(variant: PlatformContentVariant, slot: string): string {
     note = detail.post.visualDirection || "";
   }
 
+  // A text post has no per-frame note, so it falls back to the direction written for the piece
+  // as a whole. Without this the only subject left was the campaign's pillar and angle -- an
+  // internal taxonomy, not something anyone can photograph. "Tema: la cadena visible" is not a
+  // scene, and a model handed an abstraction invents scenery: it produced a jungle waterfall for
+  // a post about marketing process.
+  if (!note) note = variant.visualDirection || "";
+
   const trimmed = note.trim();
   return trimmed && !looksLikeProductionNote(trimmed) ? trimmed : "";
 }
@@ -92,14 +99,24 @@ export function buildImageRequest(
   slot: string,
   context: ImageContext = {},
 ): ImageRequest | null {
-  const subject = subjectOf(context);
   const scene = sceneNote(variant, slot);
+  const subject = subjectOf(context);
   // With neither, the prompt would be style and prohibitions only — which is exactly the empty
   // brief that produced pictures unrelated to the piece.
   if (!subject && !scene) return null;
 
+  // A written scene wins over the campaign's own words for the subject.
+  //
+  // The pillar and the angle are an internal taxonomy — "la cadena visible", "empezá por una
+  // campaña" — and nobody can photograph a taxonomy. Sent as the subject they left the model to
+  // invent something, and it invented scenery. Who the piece is for still helps: it is the
+  // difference between an office and this office. So when a scene exists it replaces the theme
+  // and keeps the audience; only with no scene does the theme stand in.
+  const audience = context.audience?.trim() ? `Para: ${context.audience.trim()}.` : "";
+  const brief = scene ? [scene, audience].filter(Boolean).join(" ") : subject;
+
   const canvas = canvasFor(variant.platform, variant.format);
-  const prompt = [STYLE, subject, scene, context.brandVisualInstructions?.trim(), COMPOSITION, NO_TEXT, NOT_THIS]
+  const prompt = [STYLE, brief, context.brandVisualInstructions?.trim(), COMPOSITION, NO_TEXT, NOT_THIS]
     .filter(Boolean)
     .join(" ");
 

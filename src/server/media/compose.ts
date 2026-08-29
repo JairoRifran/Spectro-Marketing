@@ -134,7 +134,10 @@ function artwork(canvas: Canvas, identity: BrandIdentity, slot: string, fallback
     // an unknown photograph, and in practice it left the image as a dark texture nobody could
     // read as a photograph. This is still enough to keep a light headline off a bright sky; the
     // ink is contrast-checked against it either way.
-    veil: 0.42, veilColour: identity.surface, opacity: 1,
+    // Neutral, not the brand surface. Veiling with a brand colour does not darken a photograph,
+    // it tints it -- every picture came back the same shade of green and read as a filter rather
+    // than as a photograph under a shadow.
+    veil: 0.38, veilColour: "#0b1211", opacity: 1,
   }];
 }
 
@@ -288,8 +291,9 @@ export function composeFrames(variant: PlatformContentVariant, identity: BrandId
     // headline size filled the frame and left the photograph as a texture behind it -- which is
     // the opposite of accompanying the post, and it restates in the image what the reader has
     // already read directly above.
-    return [frame("post", "Acompaña al post", canvas, identity, true, (cursor, box, ink, accent) => {
-      eyebrow(cursor, "Acompaña al post", box, accent);
+    return [frame("post", "Acompaña al post", canvas, identity, true, (cursor, box, ink) => {
+      // No eyebrow here. "Acompaña al post" is how this frame is described to us, not something
+      // an audience should read on a published image, and it was printing straight onto the art.
       heading(cursor, opening(detail.post.hook), box, ink, 3);
     })];
   }

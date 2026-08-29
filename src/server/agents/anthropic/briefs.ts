@@ -192,6 +192,8 @@ export const BRIEFS: Record<string, Brief> = {
       "",
       "Las direcciones visuales describen qué se ve — una escena, un sujeto, una situación. No son notas de producción: \"legible a 160 px\" no describe nada, y quien reciba eso no va a poder producir la imagen.",
       "",
+      "Escribí siempre una dirección visual, incluso en un post de texto: ahí es la fotografía que acompaña a la pieza. Tiene que ser algo que alguien pueda ir a fotografiar — personas, objetos, lugar, luz — y no el tema del que habla la pieza. Un pilar o un ángulo de campaña es una etiqueta interna nuestra, no una imagen; si tu dirección visual se parece a un título, todavía no describiste nada, y lo que llega al generador es una abstracción que va a resolver inventando un paisaje.",
+      "",
       "Si el brief trae una devolución humana pidiendo cambios, esa devolución es la razón de existir de esta versión. Respondela de forma concreta y verificable, sin deshacer lo que ya funcionaba.",
       "",
       "Toda afirmación que declares como claim tiene que poder respaldarse con lo que hay en el brief. Si no se puede, no la escribas.",
