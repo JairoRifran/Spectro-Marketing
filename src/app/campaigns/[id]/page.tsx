@@ -16,10 +16,13 @@ const labels:Record<(typeof tabs)[number],string>={overview:"Overview",strategy:
 function Strings({items}:{items:string[]|null|undefined}){return items?.length?<ul className="campaign-list">{items.map(item=><li key={item}>{item}</li>)}</ul>:<p className="panel-empty">Todavía no hay información para esta sección.</p>}
 
 export default async function CampaignDetailPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{tab?:string}>}){const{id}=await params;const query=await searchParams;const active=tabs.includes(query.tab as (typeof tabs)[number])?query.tab as (typeof tabs)[number]:"overview";const data=await getCampaignDetail(id);if(!data)notFound();const [contentProgress,pipeline]=await Promise.all([getCampaignContentProgress(id),getCampaignPipeline(id)]);const c=data.campaign;const objective=c.objectives as unknown as {title:string;description?:string;metric?:string;target?:number}|null;const runnable=["draft","strategy"].includes(c.status)&&data.role!=="viewer";
-  // A chain that started and did not finish needs a way back in. Without this the resume path
-  // exists in the API and is unreachable from the screen: the campaign sits in `researching`,
-  // the button is not drawn, and the only thing offered is a status pill saying it is busy.
-  const resumable=c.status==="researching"&&data.role!=="viewer";
+  // A chain that started and did not finish needs a way back in.
+  //
+  // Asked of the work, not of the campaign's status. Keying this on `researching` alone meant
+  // that the moment research persisted and the campaign advanced to `strategy`, a half-finished
+  // chain went back to offering "Run Campaign Brain" -- which reads as starting over, on a
+  // campaign whose finished stages were each paid for.
+  const resumable=data.role!=="viewer"&&(pipeline?.totals.active??0)>0;
   // Which stage a resume actually starts on. Without it the button announces "Estructurando la
   // estrategia" while research is what is running, which is worse than saying nothing: it tells
   // someone watching a slow campaign that it went back to the beginning.

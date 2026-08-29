@@ -91,7 +91,10 @@ describe("a half-finished chain can be reached from the screen", () => {
   it("offers the button while a campaign is mid-chain", () => {
     // The resume path existed in the API and was unreachable: a campaign sitting in `researching`
     // drew a status pill saying it was busy, and nothing to press.
-    expect(page).toContain('resumable=c.status==="researching"');
+    // Asked of the work, not of the campaign's status: the moment research persisted the status
+    // advanced and a half-finished chain went back to offering "Run Campaign Brain".
+    expect(page).toContain("pipeline?.totals.active??0)>0");
+    expect(page).not.toContain('c.status==="researching"');
     expect(page).toContain("runnable||resumable");
   });
 
@@ -125,6 +128,12 @@ describe("a stage waiting out its backoff is not a failure", () => {
     // and organising what is in it is not where a reasoning budget earns anything.
     const research = briefs.slice(briefs.indexOf('"campaign.research"'), briefs.indexOf('"campaign.channel_strategy"'));
     expect(research).toContain('effort: "low"');
+    // Every stage but the draft: three of them measured over the deadline, the fourth wider than
+    // the ones that were. The draft is one focused output and fits at high.
+    for (const type of ['"campaign.channel_strategy"', '"campaign.content_plan"', '"campaign.strategy.finalize"']) {
+      const from = briefs.indexOf(type);
+      expect(briefs.slice(from, from + 900), type).toContain('effort: "low"');
+    }
     const draft = briefs.slice(briefs.indexOf('"campaign.strategy.draft"'), briefs.indexOf('"campaign.research"'));
     expect(draft).toContain('effort: "high"');
   });

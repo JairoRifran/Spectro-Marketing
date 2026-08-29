@@ -100,7 +100,9 @@ export const BRIEFS: Record<string, Brief> = {
     role: "social_media_director",
     promptVersion: CAMPAIGN_PROMPTS.channelStrategy.version,
     schema: channelStrategySchema,
-    effort: "medium",
+    // Measured: this timed out at medium. Seven channels scored and argued is breadth, and the
+    // ceiling is the invocation, not the question.
+    effort: "low",
     system: role(
       "Sos quien decide en qué canales vale la pena estar. Decir que sí a todos no es una estrategia.",
     ),
@@ -119,7 +121,10 @@ export const BRIEFS: Record<string, Brief> = {
     role: "content_strategist",
     promptVersion: CAMPAIGN_PROMPTS.contentPlan.version,
     schema: contentPlanSchema,
-    effort: "high",
+    // Lowered pre-emptively, which is a trade and not a fix: this schema is wider than the two
+    // that already timed out, so running it high would buy a failure and a paid call. Pillars
+    // and angles are real judgement and deserve more thought than this gives them.
+    effort: "low",
     system: role(
       "Sos quien convierte la estrategia en dirección editorial: sobre qué se habla, desde qué ángulo y con qué peso.",
     ),
@@ -138,7 +143,9 @@ export const BRIEFS: Record<string, Brief> = {
     role: "cmo",
     promptVersion: CAMPAIGN_PROMPTS.finalBrief.version,
     schema: campaignBriefSchema,
-    effort: "medium",
+    // The smallest schema of the five, but it reads every prior stage, so its input is the
+    // largest. Low until the ceiling moves.
+    effort: "low",
     system: role(
       "Sos la responsable de marketing cerrando el brief. Lo que escribas acá es lo que lee una persona antes de aprobar o rechazar la estrategia completa.",
     ),
