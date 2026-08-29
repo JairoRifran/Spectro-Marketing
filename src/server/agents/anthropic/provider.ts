@@ -87,6 +87,11 @@ function translate(error: unknown): never {
   if (error instanceof Anthropic.RateLimitError) {
     throw new DomainError("retryable", "Anthropic limitó la tasa de pedidos. Se reintenta.", "anthropic_rate_limited", true);
   }
+  if (error instanceof Anthropic.APIUserAbortError) {
+    // Our own deadline, not the vendor's failure. Worth another attempt: the next one may land
+    // on a shorter answer, and the alternative is losing the stage to a silent kill.
+    throw new DomainError("retryable", "La respuesta de Anthropic tardó más de lo permitido. Se reintenta.", "anthropic_timeout", true);
+  }
   if (error instanceof Anthropic.APIConnectionError) {
     throw new DomainError("retryable", "No pudimos conectarnos con Anthropic.", "anthropic_unreachable", true);
   }
@@ -144,7 +149,15 @@ export class AnthropicProvider implements AgentProvider {
         output_config: { effort: brief.effort, format: zodOutputFormat(schema) },
         system: brief.system,
         messages: [{ role: "user", content: [contextFor(context), "", brief.instruction].join("\n") }],
-      }, { timeout: CALL_TIMEOUT_MS }).finalMessage();
+      }, {
+        timeout: CALL_TIMEOUT_MS,
+        // The timeout alone did not bound this. A stream that keeps emitting events is a request
+        // still making progress, so the deadline never fired and the platform killed the whole
+        // function instead — which writes no error, leaves the task marked running, and is how a
+        // campaign got stuck with nothing in its activity log to say why. An abort signal is
+        // wall-clock and does not care whether bytes are still arriving.
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      }).finalMessage();
     } catch (error) {
       translate(error);
     }

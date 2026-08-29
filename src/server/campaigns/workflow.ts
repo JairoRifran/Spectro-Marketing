@@ -16,6 +16,15 @@ const STRATEGY_STAGES = 5;
 const stepsPerCall = () => (configuredAgentProviderName() === "mock" ? STRATEGY_STAGES + 1 : 1);
 /** Leaves room inside the platform's limit for the reads and the response after the last stage. */
 const BUDGET_MS = 45_000;
+/**
+ * Just longer than an invocation can live.
+ *
+ * The lease is how long a task stays claimed after its worker stops existing. Set far above the
+ * function's own limit, a worker killed by the platform left the campaign looking busy for the
+ * remainder -- refusing to start and refusing to resume -- for no reason other than the number
+ * being large. Just above the limit is enough to be sure a live worker is never robbed.
+ */
+const LEASE_SECONDS = 75;
 
 /** Whether the chain still owes work, asked of the database rather than inferred. */
 async function pendingTasks(db: ReturnType<typeof createAdminClient>, campaignId: string) {
@@ -44,7 +53,7 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   if(taskError||!task)throw new DomainError("non_retryable","Could not start Campaign Brain.","campaign_task_create_failed",false);
   await db.from("campaigns").update({status:"researching"}).eq("id",campaignId).eq("organization_id",organizationId);
   await db.from("activity_log").insert({organization_id:organizationId,campaign_id:campaignId,action:"campaign.research_started",actor_type:"user",actor_id:userId,entity_type:"campaign",entity_id:campaignId,task_id:task.id,summary:"Campaign Brain started manually",metadata:{strategy_version:version,automation_enabled:false}});
-  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:120,budgetMs:BUDGET_MS});
+  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:LEASE_SECONDS,budgetMs:BUDGET_MS});
   // A stage that failed is a real failure and stops the run. A stage not reached yet is not:
   // the caller continues from where this invocation left off.
   if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
@@ -63,7 +72,7 @@ export async function resumeCampaignBrainForOrganization(organizationId:string,c
   const db=createAdminClient();
   const {data:campaign,error}=await db.from("campaigns").select("id,status,strategy_version").eq("id",campaignId).eq("organization_id",organizationId).single();
   if(error||!campaign)throw new DomainError("authorization","Campaign unavailable.","campaign_not_found",false);
-  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:120,budgetMs:BUDGET_MS});
+  const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:LEASE_SECONDS,budgetMs:BUDGET_MS});
   if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
   const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
   return{taskId:null,done:await pendingTasks(db,campaignId)===0,status:finished?.status??campaign.status,strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
