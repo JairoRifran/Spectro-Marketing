@@ -66,8 +66,11 @@ describe("an unfinished chain is not a failed one", () => {
     expect(workflow).not.toContain("report.completed!==5");
   });
 
-  it("reports whether work remains, asked of the database", () => {
-    expect(workflow).toContain("pendingTasks");
+  it("reports whether work remains, and when it can next be picked up", () => {
+    // The second half is what lets the screen wait by itself instead of asking a person to
+    // press the same button again.
+    expect(workflow).toMatch(/async function pending\(/);
+    expect(workflow).toContain("nextAttemptAt");
     expect(workflow).toMatch(/\.in\("status",\s*\["queued",\s*"running"\]\)/);
   });
 

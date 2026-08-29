@@ -13,6 +13,8 @@ import { DomainError } from "@/server/errors";
 // asks again until the chain is drained. Nothing about the chain lives in memory between calls,
 // which is what makes that safe.
 const STRATEGY_STAGES = 5;
+/** Matches the runtime's own bound, so a stage is re-asked rather than handed to a person. */
+const STAGE_ATTEMPTS = 6;
 const stepsPerCall = () => (configuredAgentProviderName() === "mock" ? STRATEGY_STAGES + 1 : 1);
 /** Leaves room inside the platform's limit for the reads and the response after the last stage. */
 const BUDGET_MS = 45_000;
@@ -26,10 +28,18 @@ const BUDGET_MS = 45_000;
  */
 const LEASE_SECONDS = 75;
 
-/** Whether the chain still owes work, asked of the database rather than inferred. */
-async function pendingTasks(db: ReturnType<typeof createAdminClient>, campaignId: string) {
-  const { count } = await db.from("tasks").select("id", { count: "exact", head: true }).eq("campaign_id", campaignId).in("status", ["queued", "running"]);
-  return count ?? 0;
+/**
+ * What the chain still owes, and when it can next be picked up.
+ *
+ * The second half is what lets the screen wait by itself. A stage that ran long is queued again
+ * a few seconds later, and without knowing when, the caller either hammers the endpoint or gives
+ * up and asks a person to press a button -- for a condition that resolves on its own.
+ */
+async function pending(db: ReturnType<typeof createAdminClient>, campaignId: string) {
+  const { data } = await db.from("tasks").select("scheduled_for").eq("campaign_id", campaignId).in("status", ["queued", "running"]);
+  const rows = data ?? [];
+  const times = rows.map((row) => (row.scheduled_for ? Date.parse(row.scheduled_for) : 0)).filter((value) => Number.isFinite(value));
+  return { count: rows.length, nextAttemptAt: times.length ? new Date(Math.min(...times)).toISOString() : null };
 }
 
 export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string){
@@ -49,7 +59,7 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   if(cmo.error||!cmo.data)throw new DomainError("validation","Sofía is not available for this organization.","cmo_unavailable",false);
   const objective=campaign.objectives as unknown as {title:string;description:string|null;metric:string;target:number};const version=campaign.strategy_version+1;
   const input={campaignId,campaignName:campaign.name,strategyVersion:version,objectiveTitle:objective.title,objectiveDescription:objective.description,metric:objective.metric,target:objective.target,audienceHint:campaign.target_audience??"",brandName:brand.data?.name,brandTone:brand.data?.tone_of_voice,forbiddenClaims:brand.data?.forbidden_claims??[],forbiddenWords:brand.data?.forbidden_words??[],productNames:(products.data??[]).map(item=>item.name),personaNames:(personas.data??[]).map(item=>item.name),knowledgeTitles:(knowledge.data??[]).map(item=>item.title),constraints:campaign.constraints};
-  const {data:task,error:taskError}=await db.from("tasks").insert({organization_id:organizationId,campaign_id:campaignId,objective_id:campaign.objective_id,title:`Desarrollar estrategia: ${campaign.name}`,description:"Sofía coordina Campaign Brain a partir del objetivo y el conocimiento del tenant.",type:"campaign.strategy.draft",status:"queued",priority:"high",created_by_type:"user",created_by_id:userId,assigned_agent_id:cmo.data.id,reason:"Ejecución manual solicitada por un usuario autorizado",expected_impact:"Crear un Campaign Brief sin efectos externos",risk_level:"low",requires_approval:false,scheduled_for:new Date().toISOString(),idempotency_key:`campaign:${campaignId}:strategy:${version}:draft`,input,context_snapshot:{organization_id:organizationId,objective_id:campaign.objective_id,strategy_version:version}}).select("id").single();
+  const {data:task,error:taskError}=await db.from("tasks").insert({organization_id:organizationId,campaign_id:campaignId,objective_id:campaign.objective_id,title:`Desarrollar estrategia: ${campaign.name}`,description:"Sofía coordina Campaign Brain a partir del objetivo y el conocimiento del tenant.",type:"campaign.strategy.draft",status:"queued",priority:"high",created_by_type:"user",created_by_id:userId,assigned_agent_id:cmo.data.id,reason:"Ejecución manual solicitada por un usuario autorizado",expected_impact:"Crear un Campaign Brief sin efectos externos",risk_level:"low",requires_approval:false,max_attempts:STAGE_ATTEMPTS,scheduled_for:new Date().toISOString(),idempotency_key:`campaign:${campaignId}:strategy:${version}:draft`,input,context_snapshot:{organization_id:organizationId,objective_id:campaign.objective_id,strategy_version:version}}).select("id").single();
   if(taskError||!task)throw new DomainError("non_retryable","Could not start Campaign Brain.","campaign_task_create_failed",false);
   await db.from("campaigns").update({status:"researching"}).eq("id",campaignId).eq("organization_id",organizationId);
   await db.from("activity_log").insert({organization_id:organizationId,campaign_id:campaignId,action:"campaign.research_started",actor_type:"user",actor_id:userId,entity_type:"campaign",entity_id:campaignId,task_id:task.id,summary:"Campaign Brain started manually",metadata:{strategy_version:version,automation_enabled:false}});
@@ -58,7 +68,8 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   // the caller continues from where this invocation left off.
   if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
   const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
-  return{taskId:task.id,done:await pendingTasks(db,campaignId)===0,status:finished?.status??"researching",strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
+  const left=await pending(db,campaignId);
+  return{taskId:task.id,done:left.count===0,nextAttemptAt:left.nextAttemptAt,status:finished?.status??"researching",strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
 }
 
 /**
@@ -75,5 +86,6 @@ export async function resumeCampaignBrainForOrganization(organizationId:string,c
   const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:LEASE_SECONDS,budgetMs:BUDGET_MS});
   if(report.failed>0)throw new DomainError("non_retryable","Campaign Brain no pudo completar una etapa estratégica.","campaign_workflow_incomplete",false);
   const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
-  return{taskId:null,done:await pendingTasks(db,campaignId)===0,status:finished?.status??campaign.status,strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
+  const left=await pending(db,campaignId);
+  return{taskId:null,done:left.count===0,nextAttemptAt:left.nextAttemptAt,status:finished?.status??campaign.status,strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
 }

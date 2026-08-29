@@ -109,18 +109,42 @@ describe("a half-finished chain can be reached from the screen", () => {
 describe("a stage waiting out its backoff is not a failure", () => {
   const button = read("../../../src/components/campaign-run-button.tsx");
   const briefs = read("../../../src/server/agents/anthropic/briefs.ts");
+  const dispatcher3 = read("../../../src/server/workers/dispatcher.ts");
+  const workflow = read("../../../src/server/campaigns/workflow.ts");
 
-  it("stops asking when nothing was claimable", () => {
-    // Work remains but none is claimable while a retry's backoff runs. Twelve refusals in a row
-    // would end in "could not complete", which is the wrong thing to tell someone whose campaign
-    // is merely waiting.
+  it("waits out a retry instead of handing it back to a person", () => {
+    // A deadline we set ourselves is not news to the user. The runtime queues the stage again
+    // seconds later, so the loop sleeps until it is due and carries on.
     expect(button).toContain("result.report?.claimed === 0");
-    expect(button).toContain('setState("waiting")');
+    expect(button).toContain("result.nextAttemptAt");
+    expect(button).toContain("await sleep(");
+    expect(button).toContain("continue;");
+    // The pause state is gone: there is nothing for anyone to do about it.
+    expect(button).not.toContain('setState("waiting")');
   });
 
-  it("says it is waiting, and that nothing paid for is redone", () => {
-    expect(button).toMatch(/espera su reintento/);
-    expect(button).toMatch(/no se rehace/);
+  it("says it is retrying rather than reporting a fault", () => {
+    expect(button).toMatch(/reintentando/);
+  });
+
+  it("still stops eventually, because a loop that never gives up spends all night", () => {
+    const calls = Number(button.match(/MAX_CALLS = (\d+)/)?.[1]);
+    expect(calls).toBeGreaterThan(5);
+    expect(calls).toBeLessThanOrEqual(60);
+    expect(button).toMatch(/MAX_WAIT_MS = ([\d_]+)/);
+  });
+
+  it("re-asks a stage more times than the deterministic default allowed", () => {
+    // Three was sized for a provider that either worked or did not. The same question can miss
+    // the ceiling and then make it, and the alternative to retrying is a person with SQL access.
+    expect(dispatcher3).toContain("const STAGE_ATTEMPTS = 6");
+    expect(dispatcher3).toContain("max_attempts: STAGE_ATTEMPTS");
+    expect(workflow).toContain("max_attempts:STAGE_ATTEMPTS");
+  });
+
+  it("waits seconds after our own deadline, not the outage backoff", () => {
+    expect(dispatcher3).toContain("TIMEOUT_RETRY_DELAY_MS");
+    expect(dispatcher3).toMatch(/details\.code === "anthropic_timeout" \? TIMEOUT_RETRY_DELAY_MS/);
   });
 
   it("runs research below the effort that timed out", () => {

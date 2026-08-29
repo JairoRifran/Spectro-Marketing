@@ -13,6 +13,22 @@ import { persistContentOutcome } from "@/server/content-factory/outcomes";
 type AgentRow = { id: string; organization_id: string; role: string; display_name: string; autonomy_level: 0|1|2|3; configuration: Record<string,unknown> };
 
 export interface DispatchReport { workerId: string; schedules: number; events: number; claimed: number; completed: number; retried: number; failed: number; queued: number; running: number; staleLeases: number; }
+/** A stage that merely ran long is re-asked almost immediately. */
+const TIMEOUT_RETRY_DELAY_MS = 5_000;
+
+/**
+ * How many times one stage may be re-asked before it is called failed.
+ *
+ * The database default of three was sized for a deterministic provider that either worked or
+ * did not. A model answering under a sixty-second ceiling is different: the same question can
+ * miss the deadline and then make it, so a handful of attempts is the difference between a
+ * campaign that finishes on its own and one that needs a person with SQL access.
+ *
+ * Bounded, not unlimited. Every attempt is a paid call, and a stage that cannot finish in six
+ * tries is telling us something that more tries will not fix.
+ */
+const STAGE_ATTEMPTS = 6;
+
 export interface ManualCampaignReport { workerId:string; claimed:number; completed:number; retried:number; failed:number;
   /** True when the runner stopped because its time budget ran out, not because the queue drained. */
   exhausted:boolean; }
@@ -121,7 +137,7 @@ async function persistDelegatedTasks(db: SupabaseClient, parent: RuntimeTask, de
     const item = delegated[index];
     const { data: agent } = await db.from("agents").select("id").eq("organization_id", parent.organization_id).eq("role", item.role).single();
     const key = `parent:${parent.id}:delegated:${index}:${item.type}`;
-    const { data: child } = await db.from("tasks").upsert({ organization_id: parent.organization_id, campaign_id:parent.campaign_id, title: item.title, description: item.description, type: item.type, status: "queued", priority: "medium", created_by_type: "agent", created_by_id: parent.assigned_agent_id, assigned_agent_id: agent?.id, objective_id: parent.objective_id, parent_task_id: parent.id, reason: item.reason, idempotency_key: key, input: item.input }, { onConflict: "organization_id,idempotency_key" }).select("id").single();
+    const { data: child } = await db.from("tasks").upsert({ organization_id: parent.organization_id, campaign_id:parent.campaign_id, title: item.title, description: item.description, type: item.type, status: "queued", priority: "medium", created_by_type: "agent", created_by_id: parent.assigned_agent_id, assigned_agent_id: agent?.id, objective_id: parent.objective_id, parent_task_id: parent.id, reason: item.reason, idempotency_key: key, input: item.input, max_attempts: STAGE_ATTEMPTS }, { onConflict: "organization_id,idempotency_key" }).select("id").single();
     if (child) await db.from("task_dependencies").upsert({ organization_id: parent.organization_id, task_id: child.id, depends_on_task_id: parent.id, required: true }, { onConflict: "task_id,depends_on_task_id", ignoreDuplicates: true });
   }
 }
@@ -130,14 +146,18 @@ async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: st
   const retryable = error instanceof Error && "retryable" in error && error.retryable === true;
   const decision = retryDecision(task.attempt_count, task.max_attempts, retryable);
   const details = publicError(error);
+  // Our own deadline is not the vendor failing, and the exponential backoff was built for a
+  // provider that is down. Waiting half an hour to re-ask a question that merely took too long
+  // is punishing the user for our ceiling, so a timeout waits seconds and tries again.
+  const delayMs = details.code === "anthropic_timeout" ? TIMEOUT_RETRY_DELAY_MS : decision.delayMs;
   if (taskRunId) await db.from("task_runs").update({ status: "failed", error: details, completed_at: new Date().toISOString() }).eq("id", taskRunId);
-  await db.from("tasks").update(decision.retry ? { status: "queued", scheduled_for: new Date(Date.now() + decision.delayMs).toISOString(), error: details, locked_at: null, locked_by: null, lease_expires_at: null } : { status: "failed", error: details }).eq("id", task.id).eq("locked_by", workerId);
+  await db.from("tasks").update(decision.retry ? { status: "queued", scheduled_for: new Date(Date.now() + delayMs).toISOString(), error: details, locked_at: null, locked_by: null, lease_expires_at: null } : { status: "failed", error: details }).eq("id", task.id).eq("locked_by", workerId);
   // Checked, unlike before. This insert is the only record a failed task leaves in the audit
   // trail, and it was fired and forgotten: a task went to `failed` in the tasks table while the
   // activity log stayed silent, which is the one moment the audit trail is actually being read.
   // It must not throw -- that would replace the failure being reported with a failure to report
   // it -- so it is logged instead.
-  const { error: auditError } = await db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: decision.delayMs } });
+  const { error: auditError } = await db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: decision.retry ? "task.retry_scheduled" : "task.failed", actor_type: "system", entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: task.assigned_agent_id, summary: decision.retry ? "Task retry scheduled" : "Task failed", metadata: { error: details, next_delay_ms: delayMs } });
   if (auditError) log("error", "task.audit_write_failed", { taskId: task.id }, { code: auditError.code, message: auditError.message });
   return decision.retry ? "retried" : "failed";
 }
