@@ -98,9 +98,9 @@ export function ContentGenerateButton({ campaignId, demo }: { campaignId: string
   return (
     <div className="run-action">
       <button className="primary-button" onClick={run} disabled={state === "running"}>
-        {state === "running" ? "Bruno está planificando…" : "Generate Content Plan"}
+        {state === "running" ? "Produciendo contenido…" : "Generar contenido"}
       </button>
-      {state === "error" && <small>No se pudo generar el plan. Revisá el estado de la campaña y la actividad.</small>}
+      {state === "error" && <small>No se pudo completar la producción. Revisá el estado de la campaña y la actividad.</small>}
     </div>
   );
 }

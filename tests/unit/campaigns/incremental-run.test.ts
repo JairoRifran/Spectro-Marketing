@@ -132,3 +132,19 @@ describe("the content factory runs a piece at a time too", () => {
     expect(contentButton).toContain("MAX_WAIT_MS");
   });
 });
+
+describe("the button says what it does, in the language of the app", () => {
+  const contentButton = read("../../../src/components/content-actions.tsx");
+
+  it("names the content action in Spanish like every other control", () => {
+    // It read "Generate Content Plan" in an otherwise Spanish product, so someone told where to
+    // find "Generar contenido" could not see it.
+    expect(contentButton).toContain("Generar contenido");
+    expect(contentButton).not.toContain("Generate Content Plan");
+  });
+
+  it("does not credit the whole production to the agent who only plans it", () => {
+    // Bruno writes the plan; Clara writes the pieces and Emilia reviews them.
+    expect(contentButton).not.toContain("Bruno está planificando");
+  });
+});
