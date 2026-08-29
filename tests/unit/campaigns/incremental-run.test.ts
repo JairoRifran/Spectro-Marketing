@@ -148,3 +148,32 @@ describe("the button says what it does, in the language of the app", () => {
     expect(contentButton).not.toContain("Bruno está planificando");
   });
 });
+
+describe("a run that was started keeps going without being pressed again", () => {
+  const page = read("../../../src/app/campaigns/[id]/page.tsx");
+  const contentButton = read("../../../src/components/content-actions.tsx");
+  const campaignButton = read("../../../src/components/campaign-run-button.tsx");
+
+  it("picks the work back up on mount", () => {
+    // The loop lives in the page, so a reload or a navigation abandoned a run halfway and left
+    // tasks queued with nothing to drain them and no sign anything was wrong.
+    for (const [name, source] of [["content", contentButton], ["campaign", campaignButton]] as const) {
+      expect(source, name).toContain("auto");
+      expect(source, name).toContain("started.current");
+      expect(source, name).toContain("void run();");
+    }
+  });
+
+  it("only ever continues work, never starts it", () => {
+    // Resuming spends money on a run a person already authorised. Starting one would not be
+    // theirs to authorise.
+    expect(page).toContain("auto={resumable&&!runnable}");
+    expect(page).toContain("contentPending");
+  });
+
+  it("offers the button that matches where the work actually is", () => {
+    // A campaign with content queued still said "Continuar estrategia".
+    expect(page).toMatch(/stage\.phase==="content"&&stage\.active>0/);
+    expect(page).toContain("contentPending?<ContentGenerateButton");
+  });
+});

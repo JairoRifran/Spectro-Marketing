@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Running Campaign Brain from the screen.
@@ -31,18 +31,35 @@ const MAX_WAIT_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function CampaignRunButton({ id, demo, resume = false, startStage = 0 }: {
+export function CampaignRunButton({ id, demo, resume = false, startStage = 0, auto = false }: {
   id: string;
   demo: boolean;
   /** The chain already started and stopped partway, so this continues it rather than opening a new one. */
   resume?: boolean;
   /** How many stages are already stored, so a resume names the stage it is really on. */
   startStage?: number;
+  /**
+   * The chain is already under way, so pick it up without waiting to be pressed.
+   *
+   * The loop lives in this page, so a reload abandoned a run halfway and left the campaign
+   * queued with nothing to drain it. This continues work a person already authorised; it never
+   * starts any.
+   */
+  auto?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
   const [stage, setStage] = useState(startStage);
   const [retrying, setRetrying] = useState(false);
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!auto || demo || started.current) return;
+    started.current = true;
+    void run();
+    // Once per mount: the effect is a resume, not a schedule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, demo]);
 
   async function run() {
     if (demo) { router.refresh(); return; }

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // The three human outcomes. A revision cannot be sent without feedback, because the feedback is
@@ -68,7 +68,18 @@ export function ContentActions({ id, demo, canDecide, revisionOnly = false }: { 
 const MAX_CALLS = 60;
 const MAX_WAIT_MS = 30_000;
 
-export function ContentGenerateButton({ campaignId, demo }: { campaignId: string; demo: boolean }) {
+export function ContentGenerateButton({ campaignId, demo, auto = false }: {
+  campaignId: string;
+  demo: boolean;
+  /**
+   * Production is already under way, so pick it up without waiting to be pressed.
+   *
+   * The loop lives in this page. A reload, a navigation, a closed laptop -- any of them used to
+   * abandon a run halfway, leaving pieces queued with nothing to drain them and no sign that
+   * anything was wrong. This continues work a person already authorised; it never starts any.
+   */
+  auto?: boolean;
+}) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
 
@@ -76,6 +87,15 @@ export function ContentGenerateButton({ campaignId, demo }: { campaignId: string
   // a time and says whether work remains, and a piece that ran long is queued again seconds
   // later. Waiting here is what keeps our sixty-second ceiling from becoming something the user
   // has to manage by pressing.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!auto || demo || started.current) return;
+    started.current = true;
+    void run();
+    // Once per mount: the effect is a resume, not a schedule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, demo]);
+
   async function run() {
     if (demo) { router.refresh(); return; }
     setState("running");
