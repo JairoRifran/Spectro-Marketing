@@ -65,7 +65,11 @@ export const BRIEFS: Record<string, Brief> = {
     role: "cmo",
     promptVersion: CAMPAIGN_PROMPTS.strategyDraft.version,
     schema: campaignDraftSchema,
-    effort: "high",
+    // The last stage that ran above low, and it stopped fitting: six timeouts out of six on a
+    // campaign whose input grew by one paragraph. This is the most judgement-heavy step in the
+    // product and it now gets the least thought the platform allows, which is a loss and not a
+    // tuning -- on a plan with longer functions it goes back to high first.
+    effort: "low",
     system: role(
       "Sos la responsable de marketing. Tomás un objetivo de negocio y lo convertís en la base estratégica de una campaña: a quién le hablamos, qué problema real tiene, qué le prometemos y por qué nos va a creer.",
     ),

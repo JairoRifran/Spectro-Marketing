@@ -147,6 +147,18 @@ describe("a stage waiting out its backoff is not a failure", () => {
     expect(dispatcher3).toMatch(/details\.code === "anthropic_timeout" \? TIMEOUT_RETRY_DELAY_MS/);
   });
 
+  it("stops paying to re-ask a request that already ran long", () => {
+    // A timeout is our own deadline against an unchanged request: same prompt, same schema, same
+    // budget. Six attempts buy the same answer six times and charge for each.
+    expect(dispatcher3).toContain("const TIMEOUT_ATTEMPTS = 3");
+    expect(dispatcher3).toMatch(/details\.code === "anthropic_timeout" \? Math\.min\(task\.max_attempts, TIMEOUT_ATTEMPTS\)/);
+  });
+
+  it("leaves every other failure its full budget", () => {
+    // A rate limit or an unreachable vendor is worth waiting out; a deadline we set is not.
+    expect(dispatcher3).toContain(": task.max_attempts;");
+  });
+
   it("runs research below the effort that timed out", () => {
     // Measured twice: it exceeded the deadline at high, then again at medium. Reading a context
     // and organising what is in it is not where a reasoning budget earns anything.
@@ -158,8 +170,10 @@ describe("a stage waiting out its backoff is not a failure", () => {
       const from = briefs.indexOf(type);
       expect(briefs.slice(from, from + 900), type).toContain('effort: "low"');
     }
+    // The draft ran high until six timeouts out of six proved it no longer fits. On this plan
+    // every strategic stage now thinks as little as the platform allows.
     const draft = briefs.slice(briefs.indexOf('"campaign.strategy.draft"'), briefs.indexOf('"campaign.research"'));
-    expect(draft).toContain('effort: "high"');
+    expect(draft).toContain('effort: "low"');
   });
 });
 

@@ -17,6 +17,16 @@ export interface DispatchReport { workerId: string; schedules: number; events: n
 const TIMEOUT_RETRY_DELAY_MS = 5_000;
 
 /**
+ * How many times a stage may run long before we stop paying to find out again.
+ *
+ * A timeout is our own deadline against an unchanged request: the same prompt, the same schema,
+ * the same budget. Asking it six times buys the same answer six times and charges for each. Two
+ * more attempts after the first is enough to separate a slow moment from a stage that does not
+ * fit, and stopping there says so hours earlier and for a third of the money.
+ */
+const TIMEOUT_ATTEMPTS = 3;
+
+/**
  * How many times one stage may be re-asked before it is called failed.
  *
  * The database default of three was sized for a deterministic provider that either worked or
@@ -144,8 +154,10 @@ async function persistDelegatedTasks(db: SupabaseClient, parent: RuntimeTask, de
 
 async function finishFailure(db: SupabaseClient, task: RuntimeTask, workerId: string, error: unknown, taskRunId?: string): Promise<"retried"|"failed"> {
   const retryable = error instanceof Error && "retryable" in error && error.retryable === true;
-  const decision = retryDecision(task.attempt_count, task.max_attempts, retryable);
   const details = publicError(error);
+  // A timed-out stage gets its own, much shorter budget: see TIMEOUT_ATTEMPTS.
+  const ceiling = details.code === "anthropic_timeout" ? Math.min(task.max_attempts, TIMEOUT_ATTEMPTS) : task.max_attempts;
+  const decision = retryDecision(task.attempt_count, ceiling, retryable);
   // Our own deadline is not the vendor failing, and the exponential backoff was built for a
   // provider that is down. Waiting half an hour to re-ask a question that merely took too long
   // is punishing the user for our ceiling, so a timeout waits seconds and tries again.
