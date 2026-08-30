@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { configuredAgentProviderName } from "@/server/agents/provider";
+import { credentialEncryptionConfigured } from "@/server/integrations/secret-crypto";
 
 // Health, and which build is answering.
 //
@@ -36,6 +37,8 @@ export async function GET() {
       commit,
       // Which generator writes content. "mock" means the deterministic one, whatever key is set.
       agentProvider: configuredAgentProviderName(),
+      // Boolean readiness only. The key, its identifier, and ciphertext metadata never leave.
+      credentialEncryption: credentialEncryptionConfigured(),
       timestamp: new Date().toISOString(),
     },
     { status: database ? 200 : 503, headers: { "cache-control": "no-store" } },

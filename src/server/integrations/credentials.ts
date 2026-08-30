@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SupportedPlatform } from "@/server/content/platforms";
+import { DomainError } from "@/server/errors";
+import { openSecret, sealSecret } from "./secret-crypto";
 
 // Which app a connection goes through.
 //
@@ -41,15 +43,37 @@ export async function appCredentials(
   platform: SupportedPlatform,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<AppCredentials | null> {
-  const { data } = await createAdminClient()
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("social_app_credentials")
     .select("client_id,client_secret")
     .eq("organization_id", organizationId)
     .eq("platform", platform)
     .maybeSingle();
 
+  if (error) {
+    throw new DomainError("dependency", `No se pudo leer la credencial de la app: ${error.code}`, "app_credential_read_failed", false);
+  }
+
   if (data?.client_id && data?.client_secret) {
-    return { clientId: data.client_id, clientSecret: data.client_secret, source: "organization" };
+    const context = { organizationId, platform, field: "client_secret" as const };
+    const secret = openSecret(data.client_secret, context, env);
+    if (secret.needsRewrite) {
+      const { error: updateError } = await admin
+        .from("social_app_credentials")
+        .update({ client_secret: sealSecret(secret.value, context, env) })
+        .eq("organization_id", organizationId)
+        .eq("platform", platform);
+      if (updateError) {
+        throw new DomainError(
+          "dependency",
+          `No se pudo cifrar la credencial histórica: ${updateError.code}`,
+          "app_credential_rewrite_failed",
+          false,
+        );
+      }
+    }
+    return { clientId: data.client_id, clientSecret: secret.value, source: "organization" };
   }
   return fromEnv(platform, env);
 }

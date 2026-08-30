@@ -22,7 +22,16 @@ test("approval can be decided in isolated demo mode", async ({ page }) => {
 test("health and automation endpoints expose no internals in demo",async({request})=>{
   const health=await request.get("/api/health");
   const body=await health.json();
-  expect(Object.keys(body).sort()).toEqual(["app","database","status","timestamp"]);
+  expect(Object.keys(body).sort()).toEqual([
+    "agentProvider",
+    "app",
+    "commit",
+    "credentialEncryption",
+    "database",
+    "status",
+    "timestamp",
+  ]);
+  expect(typeof body.credentialEncryption).toBe("boolean");
   const dispatch=await request.post("/api/internal/jobs/dispatch",{data:{}});
   expect(dispatch.status()).toBe(503);
   expect(await dispatch.json()).toEqual({error:"automation_disabled"});

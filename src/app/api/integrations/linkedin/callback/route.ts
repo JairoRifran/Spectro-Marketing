@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeCode, verifyState } from "@/server/integrations/linkedin";
 import { appCredentials } from "@/server/integrations/credentials";
 import { appOrigin } from "@/server/integrations/urls";
+import { sealTokenGrant } from "@/server/integrations/tokens";
 
 // Where LinkedIn sends the browser back.
 //
@@ -49,13 +50,22 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
 
+  let sealedGrant;
+  try {
+    sealedGrant = sealTokenGrant(payload.organizationId, "linkedin", {
+      accessToken: grant.accessToken,
+      refreshToken: grant.refreshToken,
+      expiresAt: grant.expiresAt,
+    });
+  } catch {
+    return back("cifrado_no_configurado");
+  }
+
   const { error: tokenError } = await admin.from("social_tokens").upsert(
     {
       organization_id: payload.organizationId,
       platform: "linkedin",
-      access_token: grant.accessToken,
-      refresh_token: grant.refreshToken,
-      expires_at: grant.expiresAt,
+      ...sealedGrant,
       scope: grant.scope,
     },
     { onConflict: "organization_id,platform" },

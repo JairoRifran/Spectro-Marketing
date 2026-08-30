@@ -2,6 +2,8 @@ import { getOrganizationContext } from "@/features/organizations/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { commentaryFor, LinkedInPublishError, publishToLinkedIn } from "@/server/integrations/linkedin-publisher";
 import type { PlatformContentVariant } from "@/server/content/schemas/variant";
+import { publicError } from "@/server/errors";
+import { socialToken } from "@/server/integrations/tokens";
 
 // Publishing a piece.
 //
@@ -45,19 +47,26 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const admin = createAdminClient();
 
-  const [{ data: integration }, { data: token }, { data: variantRow }] = await Promise.all([
+  let token;
+  try {
+    token = await socialToken(context.orgId, "linkedin");
+  } catch (error) {
+    const failure = publicError(error);
+    return Response.json({ error: failure.code, message: failure.message }, { status: 503 });
+  }
+
+  const [{ data: integration }, { data: variantRow }] = await Promise.all([
     admin.from("social_integrations").select("status,external_account_id").eq("organization_id", context.orgId).eq("platform", "linkedin").maybeSingle(),
-    admin.from("social_tokens").select("access_token,expires_at").eq("organization_id", context.orgId).eq("platform", "linkedin").maybeSingle(),
     admin.from("content_variants").select("payload").eq("content_item_id", id).eq("version", item.current_version).maybeSingle(),
   ]);
 
-  if (integration?.status !== "connected" || !token?.access_token) {
+  if (integration?.status !== "connected" || !token?.accessToken) {
     return Response.json({ error: "not_connected", message: "Conectá LinkedIn antes de publicar." }, { status: 409 });
   }
   if (!integration.external_account_id) {
     return Response.json({ error: "no_page", message: "Falta indicar en qué página de empresa publicar." }, { status: 409 });
   }
-  if (token.expires_at && new Date(token.expires_at).getTime() < Date.now()) {
+  if (token.expiresAt && new Date(token.expiresAt).getTime() < Date.now()) {
     return Response.json({ error: "token_expired", message: "El acceso a LinkedIn venció. Reconectalo." }, { status: 409 });
   }
   if (!variantRow) return Response.json({ error: "content_not_found" }, { status: 404 });
@@ -87,7 +96,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   try {
     const result = await publishToLinkedIn({
-      accessToken: token.access_token,
+      accessToken: token.accessToken,
       organizationId: integration.external_account_id,
       commentary: commentaryFor(variantRow.payload as PlatformContentVariant),
     });

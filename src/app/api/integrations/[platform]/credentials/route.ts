@@ -2,6 +2,8 @@ import { z } from "zod";
 import { getOrganizationContext } from "@/features/organizations/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPPORTED_PLATFORMS } from "@/server/content/platforms";
+import { publicError } from "@/server/errors";
+import { sealSecret } from "@/server/integrations/secret-crypto";
 
 // An organization registering its own developer app.
 //
@@ -36,12 +38,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ pla
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "validation" }, { status: 400 });
 
+  let encryptedSecret: string;
+  try {
+    encryptedSecret = sealSecret(parsed.data.clientSecret, {
+      organizationId: auth.context.orgId,
+      platform,
+      field: "client_secret",
+    });
+  } catch (error) {
+    const failure = publicError(error);
+    return Response.json({ error: failure.code, message: failure.message }, { status: 503 });
+  }
+
   const { error } = await createAdminClient().from("social_app_credentials").upsert(
     {
       organization_id: auth.context.orgId,
       platform,
       client_id: parsed.data.clientId,
-      client_secret: parsed.data.clientSecret,
+      client_secret: encryptedSecret,
       created_by: auth.context.user.id,
     },
     { onConflict: "organization_id,platform" },

@@ -20,6 +20,7 @@ const callback = read("../../../src/app/api/integrations/linkedin/callback/route
 const start = read("../../../src/app/api/integrations/linkedin/start/route.ts");
 const provider = read("../../../src/server/integrations/linkedin.ts");
 const migration = read("../../../supabase/migrations/202608300003_social_tokens.sql");
+const tokenStore = read("../../../src/server/integrations/tokens.ts");
 
 describe("the state carries what the callback must not be told", () => {
   it("round-trips the organization that started the flow", () => {
@@ -95,6 +96,12 @@ describe("what must never leak", () => {
     expect(migration).toContain("alter table public.social_tokens enable row level security");
     expect(migration).not.toMatch(/create policy .* on public\.social_tokens/);
   });
+
+  it("encrypts token grants before the database client sees them", () => {
+    expect(callback).toContain("sealTokenGrant");
+    expect(callback).not.toContain("access_token: grant.accessToken");
+    expect(tokenStore.indexOf("sealTokenGrant")).toBeLessThan(tokenStore.indexOf('.from("social_tokens")'));
+  });
 });
 
 
@@ -102,6 +109,7 @@ describe("an organization's own app", () => {
   const credsMigration = read("../../../supabase/migrations/202608300004_org_app_credentials.sql");
   const route = read("../../../src/app/api/integrations/[platform]/credentials/route.ts");
   const resolver = read("../../../src/server/integrations/credentials.ts");
+  const crypto = read("../../../src/server/integrations/secret-crypto.ts");
 
   it("keeps a customer-entered secret exactly as protected as an operator-set one", () => {
     // That a marketing lead typed it into a form rather than an operator setting an environment
@@ -115,6 +123,15 @@ describe("an organization's own app", () => {
     // for no reason at all.
     expect(route).toContain('Response.json({ configured: true, source: "organization" })');
     expect(route).not.toContain("clientSecret: parsed.data.clientSecret, source");
+  });
+
+  it("encrypts the secret before writing it and authenticates its tenant context", () => {
+    expect(route).toContain("sealSecret(parsed.data.clientSecret");
+    expect(route).not.toContain("client_secret: parsed.data.clientSecret");
+    expect(crypto).toContain("createCipheriv(\"aes-256-gcm\"");
+    expect(crypto).toContain("context.organizationId");
+    expect(crypto).toContain("context.platform");
+    expect(crypto).toContain("context.field");
   });
 
   it("prefers the organization's app over the platform's", () => {

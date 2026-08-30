@@ -91,9 +91,7 @@ export function IntegrationCredentials({ platform, label, configured, source, ca
           <input id={`${platform}-id`} value={clientId} onChange={(event) => setClientId(event.target.value)} autoComplete="off" required />
           <label htmlFor={`${platform}-secret`}>Client Secret</label>
           <input id={`${platform}-secret`} type="password" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} autoComplete="off" required />
-          {/* Precise, because the earlier wording said "cifrado" and nothing here encrypts it.
-              Claiming a protection that does not exist is worse than naming the one that does. */}
-          <small>Se guarda del lado del servidor, en una tabla que ninguna sesión de usuario puede leer, y no vuelve a mostrarse.</small>
+          <small>Se cifra en el servidor antes de guardarse, ninguna sesión de usuario puede leer la tabla y el valor no vuelve a mostrarse.</small>
           <div className="mode-actions">
             <button type="submit" className="primary-button" disabled={state === "working"}>Guardar</button>
             <button type="button" className="ghost-button" onClick={() => { setOpen(false); setClientId(""); setClientSecret(""); }}>Cancelar</button>

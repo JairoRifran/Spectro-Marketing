@@ -323,7 +323,7 @@ describe("the picture is not hidden by the stylesheet that predates it", () => {
 
   it("prints the honesty note once", () => {
     // Only the assembled playback lacks one of its own.
-    expect(page).toContain("{playable && (\n                            <p className=\"mock-disclaimer\">");
+    expect(page).toMatch(/\{playable\s*&&\s*\(\s*<p className="mock-disclaimer">/);
   });
 });
 

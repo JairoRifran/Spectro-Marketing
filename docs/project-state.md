@@ -148,5 +148,8 @@ Named because a handover that only lists achievements is a handover that hides t
 - **The two legal pages exist but are not reviewed.** They are required to submit a Meta or
   LinkedIn app and they state facts accurately, but nobody qualified has read them.
 - **The M02.2B revision chain has still never been walked in production.**
-- **Client secrets are stored unencrypted** in a table no ordinary role can read. That is
-  protection by access, not by cryptography, and the screen says so rather than claiming more.
+- **Credential encryption is implemented but still needs production cutover evidence.** New app
+  secrets and social tokens are encrypted with server-side AES-256-GCM before they reach Supabase;
+  historical plaintext is rewritten on first protected read. Production still needs
+  `CREDENTIAL_ENCRYPTION_KEY` configured and every existing integration exercised before anyone
+  can claim that all historical rows are encrypted. See `docs/credential-encryption.md`.
