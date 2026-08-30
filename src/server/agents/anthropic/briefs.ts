@@ -121,6 +121,8 @@ export const BRIEFS: Record<string, Brief> = {
       "",
       "Evaluá los siete y desactivá sin culpa los que no se sostienen con la evidencia disponible: un canal apagado con una razón clara vale más que uno encendido por las dudas. Si el research dijo que falta evidencia sobre dónde está la audiencia, eso es motivo para no priorizar, no para adivinar.",
       "",
+      "Si el contexto trae \"allowedPlatforms\" con al menos un canal, ésa es una decisión ya tomada por la organización y no una sugerencia: dejá encendidos únicamente esos, y devolvé los demás desactivados con la razón de que quedaron fuera del alcance elegido. No la discutas ni la interpretes — una organización puede no tener presencia en una red, o haber decidido no estar, y argumentar por ella es argumentar sobre algo que ya se resolvió. Dentro de los permitidos seguís decidiendo vos: prioridad, rol, formatos y peso.",
+      "",
       "El rol de cada canal tiene que ser distinto del de los demás. Si dos canales hacen lo mismo, uno sobra.",
       "",
       "La frecuencia tiene que ser sostenible por un equipo chico. Nada se publica desde Spectro: lo que propongas lo va a ejecutar una persona a mano.",

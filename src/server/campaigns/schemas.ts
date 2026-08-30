@@ -44,6 +44,9 @@ export const campaignCreateSchema = z.object({
   objectiveId:z.uuid(), name:z.string().trim().min(3).max(160).optional(), specificAudience:z.string().trim().max(1200).optional().default(""),
   startDate:z.iso.date().nullable().optional(), endDate:z.iso.date().nullable().optional(), budget:z.number().min(0).nullable().optional(),
   constraints:z.array(z.string().trim().min(1).max(500)).max(20).default([]), developStrategy:z.boolean().default(true),
+  // Channels the person is willing to consider. Empty means no restriction, which is what every
+  // campaign did before this existed.
+  platforms:z.array(z.enum(["instagram","facebook","tiktok","youtube_shorts","linkedin"])).max(5).default([]),
 }).refine(value=>!value.startDate||!value.endDate||value.endDate>=value.startDate,{message:"La fecha final debe ser posterior a la inicial",path:["endDate"]});
 
 export type CampaignDraft = z.infer<typeof campaignDraftSchema>;

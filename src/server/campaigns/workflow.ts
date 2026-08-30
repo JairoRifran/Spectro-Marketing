@@ -33,7 +33,7 @@ const pending=(db:ReturnType<typeof createAdminClient>,campaignId:string)=>pendi
 
 export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string){
   const db=createAdminClient();
-  const {data:campaign,error}=await db.from("campaigns").select("id,name,status,strategy_version,objective_id,target_audience,constraints,objectives(title,description,metric,target)").eq("id",campaignId).eq("organization_id",organizationId).single();
+  const {data:campaign,error}=await db.from("campaigns").select("id,name,status,strategy_version,objective_id,target_audience,constraints,preferred_platforms,objectives(title,description,metric,target)").eq("id",campaignId).eq("organization_id",organizationId).single();
   if(error||!campaign)throw new DomainError("authorization","Campaign unavailable.","campaign_not_found",false);
   if(!["draft","strategy"].includes(campaign.status))throw new DomainError("validation","Campaign Brain can only run for a draft or rejected strategy.","campaign_not_runnable",false);
   const {count:running}=await db.from("tasks").select("id",{count:"exact",head:true}).eq("campaign_id",campaignId).in("status",["queued","running"]);
@@ -47,7 +47,11 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   ]);
   if(cmo.error||!cmo.data)throw new DomainError("validation","Sofía is not available for this organization.","cmo_unavailable",false);
   const objective=campaign.objectives as unknown as {title:string;description:string|null;metric:string;target:number};const version=campaign.strategy_version+1;
-  const input={campaignId,campaignName:campaign.name,strategyVersion:version,objectiveTitle:objective.title,objectiveDescription:objective.description,metric:objective.metric,target:objective.target,audienceHint:campaign.target_audience??"",brandName:brand.data?.name,brandTone:brand.data?.tone_of_voice,forbiddenClaims:brand.data?.forbidden_claims??[],forbiddenWords:brand.data?.forbidden_words??[],productNames:(products.data??[]).map(item=>item.name),personaNames:(personas.data??[]).map(item=>item.name),knowledgeTitles:(knowledge.data??[]).map(item=>item.title),constraints:campaign.constraints};
+  const input={campaignId,campaignName:campaign.name,strategyVersion:version,objectiveTitle:objective.title,objectiveDescription:objective.description,metric:objective.metric,target:objective.target,audienceHint:campaign.target_audience??"",brandName:brand.data?.name,brandTone:brand.data?.tone_of_voice,forbiddenClaims:brand.data?.forbidden_claims??[],forbiddenWords:brand.data?.forbidden_words??[],productNames:(products.data??[]).map(item=>item.name),personaNames:(personas.data??[]).map(item=>item.name),knowledgeTitles:(knowledge.data??[]).map(item=>item.title),constraints:campaign.constraints,
+    // Empty means the strategist chooses freely, which is what it always did. With a list it
+    // still decides priority, role and weight -- it simply cannot propose a channel the
+    // organization already ruled out.
+    allowedPlatforms:(campaign as {preferred_platforms?:string[]}).preferred_platforms??[]};
   const {data:task,error:taskError}=await db.from("tasks").insert({organization_id:organizationId,campaign_id:campaignId,objective_id:campaign.objective_id,title:`Desarrollar estrategia: ${campaign.name}`,description:"Sofía coordina Campaign Brain a partir del objetivo y el conocimiento del tenant.",type:"campaign.strategy.draft",status:"queued",priority:"high",created_by_type:"user",created_by_id:userId,assigned_agent_id:cmo.data.id,reason:"Ejecución manual solicitada por un usuario autorizado",expected_impact:"Crear un Campaign Brief sin efectos externos",risk_level:"low",requires_approval:false,max_attempts:STAGE_ATTEMPTS,scheduled_for:new Date().toISOString(),idempotency_key:`campaign:${campaignId}:strategy:${version}:draft`,input,context_snapshot:{organization_id:organizationId,objective_id:campaign.objective_id,strategy_version:version}}).select("id").single();
   if(taskError||!task)throw new DomainError("non_retryable","Could not start Campaign Brain.","campaign_task_create_failed",false);
   await db.from("campaigns").update({status:"researching"}).eq("id",campaignId).eq("organization_id",organizationId);
