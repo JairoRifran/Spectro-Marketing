@@ -129,3 +129,23 @@ describe("the last step, in the interface", () => {
     expect(action).toContain("if (publishedUrl)");
   });
 });
+
+describe("the column the publisher depends on", () => {
+  const base = read("../../../supabase/migrations/202608300001_integrations_and_autonomy.sql");
+  const fix = read("../../../supabase/migrations/202608300006_integration_account_id.sql");
+  const accountRoute = read("../../../src/app/api/integrations/[platform]/account/route.ts");
+
+  it("exists on the table the code reads it from", () => {
+    // It was declared on social_tokens, where it is provenance for a credential, and never on
+    // social_integrations, where it is the target for a post. Both the account route and the
+    // publisher looked for it here.
+    const declared = base.includes("external_account_id") || fix.includes("add column if not exists external_account_id");
+    expect(declared).toBe(true);
+    expect(accountRoute).toContain("external_account_id");
+  });
+
+  it("is added without assuming it is absent", () => {
+    // The corrective migration will be run against databases in both states.
+    expect(fix).toContain("add column if not exists");
+  });
+});
