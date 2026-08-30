@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildPipeline, PIPELINE_STAGES, stagesOf, type TaskRow } from "@/server/content-factory/pipeline";
 
@@ -209,7 +210,9 @@ describe("the rail says what is happening, not only that something is", () => {
   it("stops the button naming a stage it cannot know", () => {
     // It counted its own calls rather than finished work, so a retry advanced the label and it
     // announced the last stage while the first agent was still on the draft.
-    expect(button).not.toContain("Consolidando el brief");
+    // Checked as an absent list rather than an absent phrase: the phrase survives in the comment
+    // that explains why it was removed, and that comment is worth more than the assertion.
+    expect(button).not.toContain("const STAGES");
     expect(button).toContain('retrying ? "Reintentando…" : "Trabajando…"');
   });
 

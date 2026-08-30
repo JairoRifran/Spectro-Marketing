@@ -94,11 +94,12 @@ describe("the screen keeps asking until it is done", () => {
     expect(Number(button.match(/MAX_CALLS = (\d+)/)?.[1])).toBeGreaterThan(5);
   });
 
-  it("names the stage instead of showing one unchanging label", () => {
-    // Five slow steps behind a single spinner reads as a hang, and the first thing anyone does
-    // with a hang is press the button again.
-    expect(button).toContain("STAGES");
-    expect(button.match(/const STAGES = \[(.*)\]/)?.[1].split(",").length).toBe(5);
+  it("does not name a stage it cannot know", () => {
+    // It used to list the five and advance on every call, which counted its own requests rather
+    // than finished work: a retry moved the label, and it announced the last stage while the
+    // first agent was still on the draft. The rail reads the task rows and says it properly.
+    expect(button).not.toContain("const STAGES");
+    expect(button).toContain('retrying ? "Reintentando…" : "Trabajando…"');
   });
 });
 

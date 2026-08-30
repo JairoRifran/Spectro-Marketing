@@ -124,7 +124,7 @@ describe("a stage waiting out its backoff is not a failure", () => {
   });
 
   it("says it is retrying rather than reporting a fault", () => {
-    expect(button).toMatch(/reintentando/);
+    expect(button).toMatch(/reintentando/i);
   });
 
   it("still stops eventually, because a loop that never gives up spends all night", () => {
