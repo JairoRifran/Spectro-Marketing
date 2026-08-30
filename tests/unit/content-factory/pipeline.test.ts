@@ -227,3 +227,39 @@ describe("the rail says what is happening, not only that something is", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });
+
+describe("a working agent is impossible to miss", () => {
+  const view = readFileSync(new URL("../../../src/components/agent-pipeline.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../../src/app/globals.css", import.meta.url), "utf8");
+
+  it("keeps something moving while a call is in flight", () => {
+    // A model call takes tens of seconds and nothing else changes on its own, so a still card is
+    // indistinguishable from a stuck one.
+    expect(view).toContain("pipeline-working-dots");
+    expect(css).toContain("@keyframes pipeline-bounce");
+  });
+
+  it("spins the ring and not the person", () => {
+    // Rotating the initials would hide exactly who you are meant to be looking at.
+    expect(view).toContain('<i className="pipeline-ring" />');
+    expect(css).toContain(".pipeline-ring{position:absolute");
+    expect(css).not.toMatch(/\.pipeline-face\{[^}]*animation:pipeline-spin/);
+  });
+
+  it("earns attention by contrast rather than by shouting", () => {
+    // One card being brighter is a claim; one card being the only bright one is obvious.
+    expect(css).toContain(".agent-pipeline.is-busy .pipeline-stage:not(.is-working)>button");
+  });
+
+  it("shows these only where work is genuinely happening", () => {
+    const stage = view.slice(view.indexOf("function Stage("), view.indexOf("function Phase("));
+    expect(stage).toContain('visual === "working" && <i className="pipeline-ring" />');
+    expect(stage).toContain('visual === "working" && (');
+  });
+
+  it("stops all of it when the system asks for less motion", () => {
+    const reduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toContain(".pipeline-ring");
+    expect(reduced).toContain(".pipeline-working-dots i");
+  });
+});

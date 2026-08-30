@@ -87,6 +87,9 @@ function Stage({ stage, selected, onSelect }: { stage: PipelineStage; selected: 
     <li className={`pipeline-stage is-${visual} tone-${TONE[stage.agentRole] ?? "slate"}${selected ? " is-selected" : ""}`}>
       <button type="button" onClick={onSelect} aria-pressed={selected}>
         <span className="pipeline-face" aria-hidden="true">
+          {/* The ring is a separate element so it can spin without spinning the initials, which
+              would make the person unreadable exactly while they are the one to look at. */}
+          {visual === "working" && <i className="pipeline-ring" />}
           {initials(stage.agentName)}
           {visual === "done" && <b className="pipeline-face-tick">✓</b>}
         </span>
@@ -98,6 +101,12 @@ function Stage({ stage, selected, onSelect }: { stage: PipelineStage; selected: 
             was decoration. The title is the task's own, never a generic label. */}
         {(visual === "working" || visual === "queued") && stage.currentTitle && (
           <span className="pipeline-task" title={stage.currentTitle}>{stage.currentTitle}</span>
+        )}
+        {/* Three dots that keep moving while the agent holds the work. A model call takes tens of
+            seconds and nothing else on the card changes in that time, so without them a working
+            stage is indistinguishable from a frozen one. */}
+        {visual === "working" && (
+          <span className="pipeline-working-dots" aria-hidden="true"><i /><i /><i /></span>
         )}
         {stage.failed > 0 && <span className="pipeline-broke">{plural(stage.failed, "falló", "fallaron")}</span>}
       </button>

@@ -536,3 +536,45 @@
   .pipeline-face-tick{animation:none}
   .pipeline-stage>button,.pipeline-stage>button:hover{transform:none;transition:none}
 }
+
+/* ── Making "someone is working" impossible to miss ─────────────────────────────────────────
+   A model call takes tens of seconds. During that time nothing on the page changes on its own,
+   so a still card is indistinguishable from a stuck one, and the honest answer is not a bigger
+   label — it is motion that only ever appears where work is genuinely happening. */
+
+/* A ring that turns around the face. Its own element, so the initials stay still and legible:
+   spinning the person would hide exactly who you are meant to be looking at. */
+.pipeline-ring{position:absolute;inset:-5px;border-radius:14px;padding:2px;background:conic-gradient(from 0deg,transparent 0deg,#16a47a 90deg,#7fd8b8 170deg,transparent 240deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:pipeline-spin 1.5s linear infinite}
+@keyframes pipeline-spin{to{transform:rotate(1turn)}}
+
+/* Three dots under the name, the plainest signal that time is passing. */
+.pipeline-working-dots{margin-top:5px;display:inline-flex;gap:3px;height:4px;align-items:center}
+.pipeline-working-dots i{width:4px;height:4px;border-radius:50%;background:#16a47a;animation:pipeline-bounce 1.05s ease-in-out infinite}
+.pipeline-working-dots i:nth-child(2){animation-delay:.15s}
+.pipeline-working-dots i:nth-child(3){animation-delay:.3s}
+@keyframes pipeline-bounce{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-3px);opacity:1}}
+
+/* The working card grows, and everything else steps back. Contrast does the work that a louder
+   colour cannot: one card being brighter is a claim, one card being the only bright one is
+   obvious from across the room. */
+.pipeline-stage.is-working>button{transform:translateY(-3px) scale(1.045);box-shadow:0 12px 26px -12px rgba(16,120,90,.5),0 0 0 1px #bfe6d6}
+.pipeline-stage.is-working>button:hover{transform:translateY(-4px) scale(1.05)}
+.agent-pipeline.is-busy .pipeline-stage:not(.is-working)>button{opacity:.58;filter:saturate(.65);transition:opacity .3s ease,filter .3s ease}
+.agent-pipeline.is-busy .pipeline-stage:not(.is-working)>button:hover{opacity:1;filter:none}
+
+/* The face itself keeps a soft glow that breathes underneath the ring. */
+.pipeline-stage.is-working .pipeline-face{box-shadow:0 0 0 4px #fff,0 0 18px -2px rgba(22,164,122,.55)}
+
+/* The connector feeding the working stage pulls toward it, so the eye travels the rail in the
+   direction the work is actually moving. */
+.pipeline-stage.is-working::before{height:3px;top:26.5px;background:linear-gradient(90deg,#bcd9c9 0 35%,#16a47a 45% 55%,#bcd9c9 65%);background-size:240% 100%;animation:pipeline-travel 1.15s linear infinite}
+
+/* The headline earns a live dot while anything is running: the one place a person looks first. */
+.agent-pipeline.is-busy header h3::after{content:"";display:inline-block;width:7px;height:7px;margin-left:8px;border-radius:50%;background:#16a47a;vertical-align:middle;animation:pipeline-blip 1.4s ease-in-out infinite}
+@keyframes pipeline-blip{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+
+@media (prefers-reduced-motion: reduce){
+  .pipeline-ring,.pipeline-working-dots i,.agent-pipeline.is-busy header h3::after{animation:none}
+  .pipeline-stage.is-working>button,.pipeline-stage.is-working>button:hover{transform:none}
+  .agent-pipeline.is-busy .pipeline-stage:not(.is-working)>button{transition:none}
+}
