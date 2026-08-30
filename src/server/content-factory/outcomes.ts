@@ -396,6 +396,30 @@ async function persistReview(db: SupabaseClient, task: RuntimeTask, result: Agen
     return;
   }
 
+  // Who finishes a piece: a person, or the policy the organization chose.
+  //
+  // Read at this moment rather than passed in, because the setting can change between a piece
+  // being written and being reviewed, and the answer that matters is the one in force when the
+  // piece is actually finished.
+  const { data: policy } = await db
+    .from("organizations").select("content_approval_mode").eq("id", organizationId).maybeSingle();
+  const automatic = (policy as { content_approval_mode?: string } | null)?.content_approval_mode === "automatic";
+
+  if (automatic) {
+    // Approved by policy, and recorded as exactly that. The temptation is to write it like any
+    // other approval so the rest of the system needs no special case; that would put a piece
+    // nobody read into the same record as a piece someone signed, and the audit trail would say
+    // a person approved something a person never saw. Publishing is a separate gate and is not
+    // touched here.
+    await checked(db.from("content_items").update({ status: "approved" }).eq("id", contentItemId).eq("organization_id", organizationId));
+    await activity(db, {
+      organizationId, campaignId, contentItemId, action: "content.approved_by_policy", agentId: agent.id, taskId: task.id,
+      summary: `La pieza de ${input.platform} quedó aprobada por política, sin lectura humana`,
+      metadata: { checks: `${quality.checksPassed}/${quality.checksTotal}`, mode: "automatic" },
+    });
+    return;
+  }
+
   await checked(db.from("content_items").update({ status: "waiting_approval" }).eq("id", contentItemId).eq("organization_id", organizationId));
 
   const { data: openApproval, error: approvalReadError } = await db

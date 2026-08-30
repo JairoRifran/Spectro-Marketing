@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Megaphone, Settings2, FileText, AudioLines} from "lucide-react";
+import { Plug, Activity, Bot, BrainCircuit, Building2, CheckSquare2, Command, Gauge, LogOut, Megaphone, Settings2, FileText, AudioLines} from "lucide-react";
 import type { ReactNode } from "react";
 import { getPendingApprovalCount } from "@/features/approvals/count";
 import { getOrganizationContext } from "@/features/organizations/context";
@@ -18,6 +18,7 @@ const primaryNav = [
 const settingsNav = [
   { href: "/settings/company", label: "Empresa", icon: Building2 },
   { href: "/settings/voice", label: "Voz", icon: AudioLines },
+  { href: "/settings/integrations", label: "Integración", icon: Plug },
   { href: "/settings/automation", label: "Automatización", icon: Settings2 },
 ];
 

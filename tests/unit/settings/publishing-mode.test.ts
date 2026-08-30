@@ -29,7 +29,7 @@ describe("who signs off, by default", () => {
   it("keeps the choice attributable", () => {
     expect(migration).toContain("publishing_mode_updated_by");
     expect(route).toContain("activity_log");
-    expect(route).toContain("org.publishing_autonomous");
+    expect(route).toContain("`org.${gate}_${relaxed ? \"automatic\" : \"human\"}`");
   });
 
   it("lets only an owner or admin change it", () => {
@@ -46,11 +46,11 @@ describe("turning the person off is harder than turning them back on", () => {
 
   it("returns to human review with a single press", () => {
     // Making a decision safer must never be harder than making it riskier.
-    expect(control).toContain('onClick={() => send("human_review")}');
+    expect(control).toContain("onClick={() => send(strictValue)}");
   });
 
   it("says plainly what a deterministic check is not", () => {
-    expect(control).toMatch(/no es\s*\n?\s*un criterio/);
+    expect(control).toMatch(/aprueba lo que no rompe ninguna regla/);
   });
 });
 
