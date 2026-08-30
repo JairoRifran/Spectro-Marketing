@@ -399,3 +399,31 @@
 .gallery-decision{margin-top:12px;padding-top:12px;border-top:1px solid #eef1f0}
 .gallery-decision .panel-empty{margin:0}
 .image-done{display:flex;align-items:center;gap:9px}
+
+/* Integración ------------------------------------------------------------------------------ */
+.integration-list{display:grid;gap:12px}
+.integration-card{border:1px solid #e6eae8;border-radius:10px;padding:14px;background:#fff}
+.integration-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.integration-card header small{display:block;color:#6b7a76;font-size:12px}
+.integration-card.is-connected{border-color:#bfe3d2}
+.integration-account{margin:0 0 8px;font-size:13px}
+.integration-error{margin:0 0 8px;font-size:13px;color:#a3352c}
+.integration-steps{margin:0 0 10px;padding-left:18px;display:grid;gap:6px}
+.integration-steps li{font-size:13px}
+.integration-steps b{display:block}
+.integration-steps span{color:#6b7a76}
+.integration-blocker{margin:0;font-size:12px;color:#6b7a76;border-top:1px solid #eef1f0;padding-top:8px}
+
+/* The switch that decides whether anyone reads a piece before an audience does. */
+.publishing-mode{display:grid;gap:12px}
+.mode-current{border-radius:10px;padding:12px;border:1px solid #e6eae8}
+.mode-current strong{display:block;margin-bottom:4px}
+.mode-current span{font-size:13px;color:#4a5754}
+.mode-current.is-autonomous{border-color:#e8c9a8;background:#fdf7f0}
+.mode-note{margin:0;font-size:13px;color:#6b7a76}
+.mode-confirm{display:grid;gap:8px;border:1px solid #e8c9a8;border-radius:10px;padding:12px;background:#fdf7f0}
+.mode-confirm p{margin:0;font-size:13px}
+.mode-confirm label{font-size:13px}
+.mode-confirm input{padding:8px 10px;border:1px solid #d8ded9;border-radius:8px;font:inherit}
+.mode-actions{display:flex;gap:8px}
+.mode-error{color:#a3352c}
