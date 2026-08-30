@@ -578,3 +578,7 @@
   .pipeline-stage.is-working>button,.pipeline-stage.is-working>button:hover{transform:none}
   .agent-pipeline.is-busy .pipeline-stage:not(.is-working)>button{transition:none}
 }
+
+/* The cause, next to the failure it explains. */
+.activity-reason{margin:4px 0 0;font-size:12px;color:#a3352c;background:#fdf1ef;border-radius:6px;padding:6px 8px}
+.activity-reason b{font-family:ui-monospace,monospace;font-size:11px}
