@@ -32,6 +32,14 @@ Until steps 4 and 5 have been exercised against production data, do not claim th
 historical row has been migrated. New writes cannot fall back to plaintext: a missing or invalid
 key makes the operation fail closed.
 
+## Production evidence
+
+On 2026-08-29, production `/api/health` reported `credentialEncryption: true` with a healthy
+database after commit `4ec8835` deployed. The authenticated integration screen showed no connected
+channel and no organization-owned developer app, so there was no historical app secret or social
+token to rewrite for the current organization. The next credential write will therefore enter the
+database encrypted from its first version.
+
 ## Rotation
 
 1. Keep the current key in `CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS`.
