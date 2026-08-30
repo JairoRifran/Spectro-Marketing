@@ -95,8 +95,8 @@ function anthropic(): Anthropic {
 /**
  * What the agent is told about this task.
  *
- * The input is sent as JSON because it already is structured — brand, products, personas,
- * knowledge titles, and the upstream steps' own output. Flattening it into prose would lose the
+ * The input is sent as JSON because it already is structured — full brand, product, persona and
+ * knowledge context, plus the upstream steps' own output. Flattening it into prose would lose the
  * nesting that says which pain belongs to which audience.
  */
 function contextFor(context: AgentContext): string {

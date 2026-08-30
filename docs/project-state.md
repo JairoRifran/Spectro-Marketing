@@ -21,6 +21,20 @@ what is half-built, and the failure modes that cost hours today and would cost t
 | Social publishing | Code exists, never run | No channel connected, no credentials |
 | Autonomous execution | Off | `AUTOMATION_ENABLED=false`, cron inactive. Not negotiable |
 
+## Campaign knowledge fidelity
+
+Campaign Brain now receives the actual content of the tenant's latest knowledge items, plus the
+full brand, product, and persona records. The earlier implementation passed only names and titles;
+that made the knowledge screen look complete while leaving the model to infer almost everything.
+Knowledge content is capped per item and by item count so later stages still retain their upstream
+outputs within the provider's context bound.
+
+Spectro's managed product knowledge states the current positioning as **governed end-to-end
+automation**: the workflow can run from objective through strategy and production to a configured
+publisher, while content approval and publishing remain independent controls. This describes a
+capability, not a fabricated production result. Cron remains off, no channel is connected, and no
+real social publication has happened yet.
+
 `AI_PROVIDER=anthropic` in production. `/api/health` reports the deployed commit and the
 configured provider — use it before debugging anything, because half of "it does not work" is a
 deploy that has not landed.

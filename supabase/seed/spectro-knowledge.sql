@@ -1,13 +1,5 @@
--- Conocimiento de producto de Spectro Marketing.
---
--- Esto no es una migracion: es contenido. Se puede correr de nuevo sin romper nada porque
--- primero borra los items que el mismo script escribio, identificados por su source.
---
--- Lo escrito aca alimenta a los agentes cuando generan campanas, asi que describe lo que la
--- herramienta hace HOY. Un conocimiento que prometa lo que todavia no existe produce contenido
--- de marketing con afirmaciones falsas, y eso no se nota hasta que ya esta publicado.
---
--- El texto usa comillas dolarizadas, asi ningun apostrofo puede romper la sentencia.
+-- Conocimiento de producto administrado de Spectro Marketing.
+-- Se puede ejecutar de nuevo: reemplaza solamente los items escritos por esta fuente.
 
 begin;
 
@@ -22,180 +14,155 @@ with org as (
   select id from public.organizations where name = 'Spectro Marketing' limit 1
 )
 insert into public.knowledge_items (organization_id, title, content, type, source, created_by_type)
-select org.id, item.title, item.content, item.type::public.knowledge_type, 'spectro:product-knowledge', 'user'
+select org.id, item.title, item.content, item.type::public.knowledge_type,
+  'spectro:product-knowledge', 'user'
 from org, (values
 
-('Que es Spectro Marketing', $txt$
-Spectro Marketing es un sistema operativo de marketing multi-tenant. No es una herramienta de
-publicacion ni un programador de posts: es la capa que decide QUE hacer y por que, y despues lo
-produce.
+('Spectro Marketing: sistema operativo de marketing automatizable', $txt$
+Spectro Marketing es un sistema operativo de marketing multi-tenant. Centraliza conocimiento de
+marca, productos, audiencias, objetivos, decisiones, contenido e integraciones en PostgreSQL como
+fuente unica de verdad.
 
-Funciona con agentes especializados que trabajan sobre una base de datos como fuente unica de
-verdad. Cada agente tiene un rol estable y una responsabilidad acotada:
+Puede automatizar de punta a punta el trabajo repetitivo: convertir un objetivo en estrategia,
+crear un plan, escribir y revisar piezas, producir recursos visuales y de audio, aplicar politicas
+de aprobacion y entregar el contenido al publicador cuando el canal y sus permisos estan
+configurados. Automatizar todo el flujo no significa operar sin gobierno: cada organizacion puede
+mantener aprobacion humana o habilitar politicas automaticas de forma explicita.
 
-- Sofia (CMO): toma el objetivo de negocio y estructura la campana alrededor de el.
-- Mateo (Market Intelligence): investiga el mercado y separa lo que sirve de lo que no.
-- Valentina (Social Media): decide en que plataformas vale la pena estar y con cuanto peso.
-- Bruno (Content Strategist): convierte la estrategia en pilares, angulos y piezas concretas.
-- Clara (Copywriter): escribe cada pieza en el formato nativo de su plataforma.
-- Emilia (Creative Director): define como se ve y como se mueve cada pieza.
-
-Nada avanza sin una decision humana registrada. Todo queda con trazabilidad auditada.
+Los agentes tienen responsabilidades estables: Sofia dirige la estrategia; Mateo investiga;
+Valentina prioriza canales; Bruno diseña pilares, angulos y planes; Clara escribe; Emilia dirige
+la ejecucion creativa. Las tareas son persistentes, reintentables, idempotentes y auditadas.
 $txt$, 'company'),
 
-('Campaign Brain: de un objetivo a un brief aprobable', $txt$
-Campaign Brain arranca en un objetivo de negocio y termina en un brief de campana versionado
-que una persona puede aprobar o discutir.
+('Flujo completo que Spectro puede automatizar', $txt$
+El flujo conectado es: objetivo de negocio -> Campaign Brain -> Campaign Brief versionado ->
+aprobacion estrategica -> Content Factory -> plan por canal -> copy nativo -> revision creativa ->
+imagenes, voz o musica cuando corresponde -> aprobacion segun politica -> publicacion mediante una
+integracion autorizada.
 
-En el camino produce, en este orden: investigacion de mercado, definicion de audiencia,
-priorizacion de canales, pilares de contenido y angulos. Cada paso queda guardado con su
-version, de modo que se puede ver por que la campana quedo como quedo.
+La aprobacion de contenido y el modo de publicacion son controles independientes. Ambos empiezan
+en modo humano seguro; un propietario puede cambiar cada uno de forma deliberada. El motor
+autonomo usa eventos, horarios, tareas cortas, leases, reintentos e idempotencia, no procesos
+permanentes. En produccion la ejecucion autonoma programada y el cron siguen desactivados hasta
+que el propietario decida habilitarlos.
 
-La investigacion distingue explicitamente entre lo que sale de conocimiento previo y lo que
-requiere fuentes externas, y expone los supuestos y los huecos que no pudo cerrar. Un brief que
-no dice de donde sale lo que afirma es un brief que nadie puede auditar.
-
-Campaign Brain no produce ni publica posts. Termina en el brief.
+Posicionamiento permitido: "Spectro puede automatizar la operacion de marketing de punta a punta
+con controles configurables". No convertir esa capacidad en la afirmacion falsa de que hoy esta
+publicando autonomamente en todos los canales.
 $txt$, 'product'),
 
-('Content Factory: del brief a piezas nativas por plataforma', $txt$
-Content Factory toma un brief aprobado y produce piezas concretas, una por plataforma y formato.
+('Campaign Brain: del objetivo a una estrategia auditable', $txt$
+Campaign Brain comienza con un objetivo y termina en un Campaign Brief versionado. Ejecuta cinco
+etapas encadenadas y reanudables: borrador estrategico, investigacion, estrategia de canales,
+pilares y angulos de contenido, y brief final.
 
-Reparte los pilares segun el peso que la estrategia le dio a cada canal, y escribe cada pieza
-en el formato nativo de su plataforma: un carrusel de Instagram no es el mismo texto de un post
-de LinkedIn con otro recorte. Un control de calidad deterministico revisa cada pieza antes de
-que llegue a una persona, y bloquea la que no cumple.
-
-Plataformas soportadas: Instagram, Facebook, TikTok, YouTube Shorts y LinkedIn.
-
-Cada pieza mantiene su linaje completo: de que concepto salio, que agente la escribio, que
-version es, quien la reviso y quien la decidio.
+Cada etapa recibe la marca completa, productos, personas y el contenido del conocimiento cargado,
+ademas de la salida de las etapas anteriores. La investigacion distingue conocimiento disponible
+de vacios externos y declara supuestos. Las palabras y afirmaciones prohibidas se validan de forma
+deterministica antes de que el brief quede listo. Campaign Brain decide la estrategia; Content
+Factory se ocupa de producir las piezas.
 $txt$, 'product'),
 
-('Produccion de audio: voz en off y musica', $txt$
-Spectro genera la voz en off de una pieza a partir de su propio guion, y una pista instrumental
-a partir del tono de la marca.
+('Content Factory: piezas nativas con linaje completo', $txt$
+Content Factory toma un brief aprobado, distribuye los pilares segun el peso de cada canal y crea
+piezas nativas para Instagram, Facebook, TikTok, YouTube Shorts y LinkedIn. Un carrusel, un post
+de LinkedIn y un guion vertical no son el mismo texto recortado: cada formato tiene su propia
+estructura validada.
 
-La voz se pide por lo que se quiere, no por un identificador de proveedor: se elige un tono
--- reflexiva, entusiasta, comercial, cercana, autoritaria o informativa -- y una region --
-rioplatense, mexicana, castellana, colombiana o espanol neutro. El tono decide como se lee; la
-region decide que voz se usa, porque ningun parametro convierte un acento en otro.
-
-Si la marca pidio una region para la que no hay voz cargada, el sistema no genera nada en vez de
-usar otro acento.
-
-La musica es siempre instrumental: una voz en off y una pista cantada compiten por la misma
-atencion. Cuando ya existe voz, su duracion real define la de la musica.
+El plan es deterministico; el copy y la revision creativa usan un modelo real. Cada pieza conserva
+campaña, concepto, plataforma, formato, version, agente autor, revisiones, aprobacion y actividad.
+Pedir cambios crea una nueva version sin sobrescribir la anterior. La cadena de revision esta
+construida, aunque todavia debe recorrerse completa en produccion.
 $txt$, 'product'),
 
-('Produccion visual: composicion y arte generada', $txt$
-Cada pieza se compone como diseno deterministico: tipografia sobre una superficie de marca, a
-medidas reales de entrega -- 1080x1350 para carrusel, 1080x1920 para vertical. Es una funcion
-pura, asi que la misma pieza siempre produce el mismo frame.
+('Produccion visual, voz y musica', $txt$
+Spectro compone visuales de marca en medidas reales de entrega y puede generar arte fotografico a
+partir del pilar, angulo y audiencia de la pieza. Las imagenes generadas son reales y actualmente
+usan un proveedor gratuito. El resultado se puede descargar como PNG.
 
-Encima de eso puede generarse arte fotografico. La imagen va detras del texto con un velo que
-mantiene el titular legible, y el tema sale de lo que la campana ya decidio: su pilar, su angulo
-y para quien es. Si ni la campana ni la pieza describen un sujeto, no se genera imagen.
-
-Todo se puede descargar como paquete: las imagenes como PNG a medida de entrega, el audio, y el
-texto para pegar en el compositor de cada red.
+Tambien puede generar voz en off y musica instrumental con ElevenLabs. La voz se elige por tono y
+region; si no existe una voz valida para la region solicitada, el sistema no sustituye el acento.
+La musica evita competir con la voz y adapta su duracion al audio existente. Voz y musica estan
+protegidas por el techo de gasto. Spectro previsualiza frames y audio, pero todavia no renderiza un
+archivo de video final.
 $txt$, 'product'),
 
-('Control humano y trazabilidad', $txt$
-Es la diferencia central de Spectro frente a un generador de contenido.
+('Publicacion e integraciones: estado actual', $txt$
+Spectro ya tiene catalogo de canales, OAuth seguro, almacenamiento cifrado de credenciales,
+identificador de cuenta externa, modos de aprobacion/publicacion y registros idempotentes de
+publicacion. LinkedIn es el publicador mas avanzado: existen el flujo OAuth, el campo para el id
+numerico de pagina, el publicador y el boton sobre piezas aprobadas.
 
-Ninguna pieza avanza sola. Aprobar, pedir cambios o rechazar es siempre una accion humana
-autenticada, y queda registrada con quien la tomo y cuando. Pedir una revision crea una version
-nueva: la anterior queda intacta en el historial, nunca se sobreescribe.
-
-Toda la actividad queda en un registro auditado con resumenes y identificadores de correlacion.
-Ese registro nunca contiene prompts, credenciales ni secretos.
-
-Cada fila pertenece a una organizacion y esta protegida a nivel de base de datos. Una
-organizacion no puede ver el trabajo de otra, y eso lo garantiza el motor, no el codigo.
+Todavia no se realizo ninguna publicacion real y no hay un canal conectado. Publicar como pagina
+de LinkedIn requiere que la app obtenga w_organization_social mediante su programa de partners;
+la opcion self-service publica como persona y no responde al caso elegido. Instagram, Facebook,
+TikTok y YouTube requieren completar sus apps, permisos y revision antes de publicar desde
+Spectro. Nunca afirmar que todas las redes estan conectadas o que ya existen resultados reales.
 $txt$, 'product'),
 
-('Control de gasto', $txt$
-Generar audio o imagenes cuesta dinero, asi que Spectro tiene un techo de gasto por organizacion
-y por campana.
+('Seguridad, aislamiento, auditoria y control de gasto', $txt$
+Cada dato de negocio pertenece a una organizacion y esta protegido por RLS. Los clientes de
+Supabase estan separados entre navegador, usuario SSR y administrador server-only. Las
+credenciales sociales y secretos de apps se cifran con AES-256-GCM antes de guardarse; la clave
+de servicio y la clave de cifrado nunca llegan al cliente.
 
-La postura es negar por defecto: un tope que nunca se configuro vale cero, y cero no autoriza
-nada. La decision se toma dentro de la base de datos, bajo bloqueo, en la misma transaccion que
-escribe la reserva -- un chequeo en codigo es una lectura que ya quedo vieja para cuando se
-escribe.
+La actividad guarda resumenes e identificadores de correlacion, no prompts ni secretos. Los
+efectos externos se reservan con claves de idempotencia. Audio e imagenes pagas respetan techos
+por organizacion y campaña: se reserva antes de llamar al proveedor, se liquida el costo real y
+se libera la reserva si falla. Un limite no configurado niega el gasto por defecto.
+$txt$, 'policy'),
 
-Primero se reserva, despues se llama al proveedor, y al final se liquida con lo que realmente
-costo. Si la llamada falla, la reserva se libera. Un reintento presenta la misma clave y no paga
-dos veces.
+('Lo que Spectro todavia no debe prometer', $txt$
+Estas limitaciones forman parte de la verdad del producto:
 
-Antes de gastar, la interfaz muestra cuanto costaria. Nada gasta sin decir cuanto gasta.
-$txt$, 'product'),
+- No existe evidencia de una publicacion real desde Spectro. El publicador de LinkedIn esta
+  construido pero no probado contra la API real.
+- No estan conectadas todas las redes y sus permisos dependen de aprobaciones externas.
+- La automatizacion autonoma programada y el cron estan desactivados en produccion.
+- No programa todavia un calendario editorial recurrente desde la interfaz.
+- No gestiona pauta ni presupuesto publicitario y no reporta metricas reales de alcance,
+  impresiones, engagement o conversiones.
+- No renderiza video final; compone y previsualiza recursos visuales y de audio.
+- Las paginas legales existen pero no fueron revisadas por un profesional calificado.
 
-('Lo que Spectro TODAVIA NO hace', $txt$
-Este item existe para que ningun contenido generado prometa algo que no es cierto. Al escribir
-sobre Spectro, no se puede afirmar nada de lo siguiente:
-
-- NO publica en redes sociales. No hay integracion con Instagram, Facebook, TikTok, YouTube ni
-  LinkedIn. El contenido se produce y se descarga; publicar es manual.
-- NO programa publicaciones ni gestiona un calendario de posteo.
-- NO gestiona pauta ni presupuesto publicitario.
-- NO reporta metricas de rendimiento: alcance, impresiones, engagement, conversiones. Como nada
-  se publica desde Spectro, cualquier numero de esos seria inventado.
-- NO tiene automatizacion activa. Todo corre por una accion humana explicita.
-- NO edita ni renderiza video. Ensambla frames y audio para previsualizar, que no es lo mismo.
-
-Escribir sobre cualquiera de estas cosas como si existieran seria una afirmacion falsa sobre el
-propio producto.
+Se puede comunicar la capacidad de automatizar el flujo completo, pero no presentar una capacidad
+construida o configurable como si ya estuviera activa y comprobada en produccion.
 $txt$, 'policy'),
 
 ('Afirmaciones prohibidas al hablar de Spectro', $txt$
-Nunca afirmar, en ninguna pieza:
+Nunca inventar cifras de resultados, mejoras, clientes, usuarios, volumen procesado, benchmarks,
+casos de exito, certificaciones, premios o comparaciones cuantitativas. No afirmar que reemplaza a
+un equipo de marketing, que opera sin supervision en produccion, que publica en todas las redes,
+que una integracion pendiente ya funciona o que genera metricas que nunca recibio.
 
-- Cifras de resultados, porcentajes de mejora o casos de exito. No hay clientes con resultados
-  medidos todavia.
-- Numeros de usuarios, empresas o volumen procesado.
-- Comparaciones cuantitativas con competidores.
-- Que el marketing se hace "solo" o "sin intervencion humana". Es lo contrario de como funciona:
-  el control humano es la caracteristica, no una limitacion.
-- Que reemplaza a un equipo de marketing. Coordina y produce; decide una persona.
-- Certificaciones, premios o integraciones que no existen.
-
-Cuando haga falta un dato duro que no se tiene, es preferible reformular la idea sin el numero
-antes que inventarlo.
+Si falta evidencia, reformular sin el dato o declarar el supuesto. Si se habla de automatizacion,
+usar una formulacion precisa: Spectro puede automatizar de punta a punta la operacion repetitiva
+con aprobaciones y limites configurables. Evitar "magia", "sin esfuerzo", "resultados garantizados",
+"revolucionario", "potenciar", "desbloquear" y "el futuro del marketing".
 $txt$, 'policy'),
 
 ('A quien le sirve Spectro', $txt$
-Perfil principal: responsable de marketing en una PyME B2B, tipicamente equipo de una a cinco
-personas, sin estructura para sostener produccion constante de contenido.
+El perfil principal es la persona responsable de marketing en una PyME B2B o un equipo pequeño
+que necesita sostener produccion sin perder criterio. Su estrategia suele estar dispersa entre
+documentos, conversaciones y la memoria de una persona; la ejecucion repetitiva consume tiempo y
+hace dificil explicar por que se eligio una pieza.
 
-El problema real: el equipo dedica gran parte de la semana a tareas repetitivas que nadie
-documento nunca. La estrategia existe en la cabeza de alguien y se pierde entre la ejecucion.
-
-Lo que valora: no producir mas rapido, sino producir con criterio y poder explicar por que se
-publico lo que se publico. La trazabilidad no es burocracia para este perfil; es lo que le
-permite defender decisiones ante su direccion.
-
-Objeciones frecuentes: miedo a perder control sobre la voz de la marca, desconfianza hacia
-contenido generado que suena generico, y experiencias previas con herramientas que prometieron
-automatizacion y dejaron mas trabajo del que sacaron.
+Valora consistencia, velocidad con control, reutilizacion del conocimiento y trazabilidad. Sus
+objeciones reales son perder la voz de marca, recibir contenido generico, delegar demasiado en IA
+y terminar administrando otra herramienta que agrega trabajo. Spectro responde conectando las
+decisiones, mostrando supuestos, conservando versiones y permitiendo elegir donde interviene una
+persona y donde actua una politica automatica.
 $txt$, 'persona'),
 
 ('Como habla Spectro de si mismo', $txt$
-Tono: claro y directo. Sin jerga de producto, sin superlativos, sin promesas de transformacion.
+Tono claro, directo, profesional y concreto. Hablar de capacidades demostrables y controles
+visibles, no de sensaciones ni superlativos. Preferir "cada pieza conserva su version, autor y
+aprobacion" a "trazabilidad total"; preferir "automatiza del objetivo a la publicacion cuando el
+canal esta autorizado" a "el marketing se hace solo".
 
-Principios de escritura:
-
-- Decir lo que la herramienta hace, no lo que se siente usarla.
-- Preferir un ejemplo concreto a un adjetivo. "Cada pieza guarda quien la aprobo y cuando" dice
-  mas que "trazabilidad total".
-- Nombrar las limitaciones cuando son relevantes. Una herramienta que dice lo que no hace es mas
-  creible que una que solo enumera virtudes.
-- No hablarle al lector como si no supiera hacer su trabajo.
-- Evitar "revolucionario", "potenciar", "desbloquear", "game changer" y cualquier variante de
-  "el futuro del marketing".
-
-El control humano es el argumento central, no una nota al pie. La mayoria de las herramientas de
-esta categoria venden que sacan a la persona del medio; Spectro vende lo contrario.
+La idea central actual es automatizacion gobernada: Spectro permite automatizar todo el flujo
+repetitivo sin obligar a perder control. El usuario decide las aprobaciones, los limites de gasto,
+los canales y el modo de publicacion. Nombrar las limitaciones relevantes aumenta credibilidad.
 $txt$, 'brand')
 
 ) as item(title, content, type);

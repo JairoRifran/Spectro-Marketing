@@ -27,6 +27,9 @@ const BUDGET_MS = 45_000;
  * being large. Just above the limit is enough to be sure a live worker is never robbed.
  */
 const LEASE_SECONDS = 75;
+/** Keep rich tenant knowledge useful without crowding later stages' upstream output out of context. */
+const KNOWLEDGE_ITEM_LIMIT = 16;
+const KNOWLEDGE_CONTENT_LIMIT = 2_500;
 
 /** Delegated to the shared helper so both manual paths answer this the same way. */
 const pending=(db:ReturnType<typeof createAdminClient>,campaignId:string)=>pendingCampaignWork(db,campaignId);
@@ -39,15 +42,16 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   const {count:running}=await db.from("tasks").select("id",{count:"exact",head:true}).eq("campaign_id",campaignId).in("status",["queued","running"]);
   if(running)throw new DomainError("validation","Campaign Brain is already running.","campaign_already_running",false);
   const [brand,products,personas,knowledge,cmo]=await Promise.all([
-    db.from("brands").select("name,tone_of_voice,forbidden_claims,forbidden_words").eq("organization_id",organizationId).limit(1).maybeSingle(),
-    db.from("products").select("name").eq("organization_id",organizationId).limit(10),
-    db.from("personas").select("name").eq("organization_id",organizationId).limit(10),
-    db.from("knowledge_items").select("title").eq("organization_id",organizationId).limit(20),
+    db.from("brands").select("name,description,slogan,tone_of_voice,personality,preferred_words,forbidden_claims,forbidden_words,visual_instructions,communication_examples").eq("organization_id",organizationId).limit(1).maybeSingle(),
+    db.from("products").select("name,description,kind,category,value_proposition,price_text,url").eq("organization_id",organizationId).limit(10),
+    db.from("personas").select("name,description,pains,needs,motivations,objections,channels,metadata").eq("organization_id",organizationId).limit(10),
+    db.from("knowledge_items").select("title,content,type,source,updated_at").eq("organization_id",organizationId).order("updated_at",{ascending:false}).limit(KNOWLEDGE_ITEM_LIMIT),
     db.from("agents").select("id").eq("organization_id",organizationId).eq("role","cmo").eq("status","active").single(),
   ]);
   if(cmo.error||!cmo.data)throw new DomainError("validation","Sofía is not available for this organization.","cmo_unavailable",false);
   const objective=campaign.objectives as unknown as {title:string;description:string|null;metric:string;target:number};const version=campaign.strategy_version+1;
-  const input={campaignId,campaignName:campaign.name,strategyVersion:version,objectiveTitle:objective.title,objectiveDescription:objective.description,metric:objective.metric,target:objective.target,audienceHint:campaign.target_audience??"",brandName:brand.data?.name,brandTone:brand.data?.tone_of_voice,forbiddenClaims:brand.data?.forbidden_claims??[],forbiddenWords:brand.data?.forbidden_words??[],productNames:(products.data??[]).map(item=>item.name),personaNames:(personas.data??[]).map(item=>item.name),knowledgeTitles:(knowledge.data??[]).map(item=>item.title),constraints:campaign.constraints,
+  const knowledgeItems=(knowledge.data??[]).map(({title,content,type,source})=>({title,type,source,content:content.slice(0,KNOWLEDGE_CONTENT_LIMIT)}));
+  const input={campaignId,campaignName:campaign.name,strategyVersion:version,objectiveTitle:objective.title,objectiveDescription:objective.description,metric:objective.metric,target:objective.target,audienceHint:campaign.target_audience??"",brandName:brand.data?.name,brandTone:brand.data?.tone_of_voice,forbiddenClaims:brand.data?.forbidden_claims??[],forbiddenWords:brand.data?.forbidden_words??[],productNames:(products.data??[]).map(item=>item.name),personaNames:(personas.data??[]).map(item=>item.name),knowledgeTitles:knowledgeItems.map(item=>item.title),brandContext:brand.data??null,products:products.data??[],personas:personas.data??[],knowledgeItems,constraints:campaign.constraints,
     // Empty means the strategist chooses freely, which is what it always did. With a list it
     // still decides priority, role and weight -- it simply cannot propose a channel the
     // organization already ruled out.
