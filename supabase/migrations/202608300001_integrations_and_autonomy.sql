@@ -14,7 +14,13 @@
 --
 -- Forward-only: creates two objects, alters nothing that exists.
 
-create type public.integration_status as enum ('not_connected','connected','expired','error');
+-- Guarded so a re-run after a failed attempt does not stop on the type alone. The first attempt
+-- failed on a policy further down and rolled back, but a migration that cannot be re-read and
+-- re-run is a migration nobody dares touch.
+do $$ begin
+  create type public.integration_status as enum ('not_connected','connected','expired','error');
+exception when duplicate_object then null;
+end $$;
 
 create table public.social_integrations (
   id uuid primary key default gen_random_uuid(),
@@ -42,9 +48,12 @@ create policy social_integrations_read on public.social_integrations
   for select using (public.is_org_member(organization_id));
 
 -- Connecting a channel is an administrative act, not ordinary member work.
+-- The array is cast to the role enum, the way every other policy in this schema does it: the
+-- function takes public.organization_role[], and an uncast literal is text[], which does not
+-- match and fails at create time rather than at query time.
 create policy social_integrations_write on public.social_integrations
-  for all using (public.has_org_role(organization_id, array['owner','admin']))
-  with check (public.has_org_role(organization_id, array['owner','admin']));
+  for all using (public.has_org_role(organization_id, array['owner','admin']::public.organization_role[]))
+  with check (public.has_org_role(organization_id, array['owner','admin']::public.organization_role[]));
 
 create trigger social_integrations_updated_at
   before update on public.social_integrations

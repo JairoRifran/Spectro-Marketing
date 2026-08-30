@@ -72,3 +72,21 @@ describe("the channel catalogue tells the truth about what is missing", () => {
     }
   });
 });
+
+describe("the migration matches the schema it is written against", () => {
+  const foundation = read("../../../supabase/migrations/202608260001_m01_foundation.sql");
+
+  it("casts the role array the way has_org_role declares it", () => {
+    // has_org_role takes public.organization_role[]. An uncast literal is text[], and Postgres
+    // refuses the policy at create time — which is how the first run of this migration failed.
+    expect(foundation).toContain("has_org_role(org_id uuid, allowed public.organization_role[])");
+    for (const match of migration.matchAll(/has_org_role\([^)]*\)/g)) {
+      expect(match[0]).toContain("::public.organization_role[]");
+    }
+  });
+
+  it("can be re-run after a failed attempt", () => {
+    // A migration nobody dares run twice is a migration nobody dares fix.
+    expect(migration).toContain("exception when duplicate_object then null");
+  });
+});
