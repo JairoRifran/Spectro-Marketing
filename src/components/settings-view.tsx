@@ -25,8 +25,16 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
             {row?.handle&&<p className="integration-account">Conectado como <b>{row.handle}</b>{row.accountName?` · ${row.accountName}`:""}</p>}
             {row?.lastError&&<p className="integration-error">{row.lastError}</p>}
             <ol className="integration-steps">
-              {spec.requirements.map(requirement=><li key={requirement.label}><b>{requirement.label}</b><span>{requirement.detail}</span></li>)}
+              {spec.steps.map(step=><li key={step.title}>
+                <b>{step.title}</b>
+                <span>{step.detail}</span>
+                {step.where&&<em>en {step.where}</em>}
+              </li>)}
             </ol>
+            <dl className="integration-meta">
+              <div><dt>Termina en</dt><dd>{spec.credentials.join(" · ")}</dd></div>
+              <div><dt>Espera</dt><dd>{spec.waiting}</dd></div>
+            </dl>
             <p className="integration-blocker">{spec.blocker}</p>
           </article>;
         })}
@@ -37,8 +45,18 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
         Cada red exige una app de desarrollador creada bajo una cuenta tuya, con su cliente OAuth y,
         en la mayoría de los casos, una revisión de la propia plataforma antes de conceder permiso
         para publicar. Nada de eso lo puede hacer este sistema por su cuenta: empieza con una persona
-        dando de alta la app. Hasta que esas credenciales existan y queden guardadas como variables
-        de entorno del servidor, esta pantalla describe el estado real — que es sin conectar.
+        dando de alta la app.
+      </p>
+      <p>
+        Los canales están en el orden en que conviene hacerlos. LinkedIn primero: es el más rápido de
+        habilitar y el único que ya tiene contenido generado esperando. Instagram y Facebook comparten
+        una misma app y una misma revisión de Meta, así que se hacen juntos o no se hace ninguno.
+      </p>
+      <p>
+        Las credenciales que salen de cada guía van como variables de entorno en el servidor, igual que
+        la clave de Anthropic. Nunca a un archivo del repositorio, nunca a un chat, nunca a esta pantalla.
+        Los nombres exactos de menús y botones dentro de cada portal cambian seguido: los pasos describen
+        qué conseguir, no dónde hacer clic.
       </p>
     </Panel>
   </div>}

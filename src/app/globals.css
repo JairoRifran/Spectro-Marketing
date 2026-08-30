@@ -410,8 +410,14 @@
 .integration-error{margin:0 0 8px;font-size:13px;color:#a3352c}
 .integration-steps{margin:0 0 10px;padding-left:18px;display:grid;gap:6px}
 .integration-steps li{font-size:13px}
+.integration-steps li::marker{color:#16a47a;font-weight:700}
 .integration-steps b{display:block}
-.integration-steps span{color:#6b7a76}
+.integration-steps span{color:#4a5754}
+.integration-steps em{display:block;margin-top:2px;font-style:normal;font-size:12px;color:#8a9793}
+.integration-meta{display:grid;gap:6px;margin:0 0 10px;padding:10px;background:#f7f9f8;border-radius:8px}
+.integration-meta div{display:flex;gap:8px;font-size:12px}
+.integration-meta dt{color:#6b7a76;min-width:74px}
+.integration-meta dd{margin:0;font-family:ui-monospace,monospace}
 .integration-blocker{margin:0;font-size:12px;color:#6b7a76;border-top:1px solid #eef1f0;padding-top:8px}
 
 /* The switch that decides whether anyone reads a piece before an audience does. */

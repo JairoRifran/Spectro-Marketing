@@ -62,7 +62,38 @@ describe("the channel catalogue tells the truth about what is missing", () => {
   it("names a real blocker for each, not a generic one", () => {
     const blockers = INTEGRATIONS.map((item) => item.blocker);
     expect(new Set(blockers).size).toBe(blockers.length);
-    for (const item of INTEGRATIONS) expect(item.requirements.length, item.platform).toBeGreaterThan(1);
+  });
+
+  it("gives steps to follow rather than requirements to contemplate", () => {
+    // A requirement says what is missing; a person staring at it still has to work out where to
+    // go and in what order.
+    for (const item of INTEGRATIONS) {
+      expect(item.steps.length, item.platform).toBeGreaterThan(2);
+      expect(item.steps.some((step) => step.where), item.platform).toBe(true);
+      expect(item.credentials.length, item.platform).toBeGreaterThan(0);
+    }
+  });
+
+  it("names the environment variables each guide ends in", () => {
+    // The point of the guide is a credential on the server. Ending without naming it leaves the
+    // last step as "and then somehow".
+    for (const item of INTEGRATIONS) {
+      for (const name of item.credentials) expect(name, item.platform).toMatch(/^[A-Z][A-Z0-9_]+$/);
+    }
+  });
+
+  it("points at portals rather than deep links", () => {
+    // Deep links inside these portals rot faster than anything else in the guide.
+    for (const item of INTEGRATIONS) {
+      for (const step of item.steps) {
+        if (step.where) expect(step.where, item.platform).not.toContain("/");
+      }
+    }
+  });
+
+  it("puts the reachable channel first", () => {
+    // LinkedIn is the fastest to enable and the only one with content already waiting.
+    expect(INTEGRATIONS[0]!.platform).toBe("linkedin");
   });
 
   it("stores no credential anywhere near the application's own database", () => {
