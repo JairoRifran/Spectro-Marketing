@@ -39,23 +39,13 @@ export interface IntegrationSpec {
 
 const META_PORTAL = "developers.facebook.com";
 
+// Ordered by how reachable each one actually is, which is not the order anyone assumes.
+//
+// LinkedIn was first here on the belief that its review was the lightest. Opening the portal
+// disproved it: posting as a company page needs the partner programme. The channels above it
+// gate publishing behind an app review, which is a form and a screencast -- slow, but something
+// a person can finish alone.
 export const INTEGRATIONS: IntegrationSpec[] = [
-  {
-    platform: "linkedin",
-    label: "LinkedIn",
-    accountType: "Página de empresa donde seas administrador",
-    waiting: "La habilitación del producto de publicación suele resolverse en días.",
-    steps: [
-      { title: "Verificá que administrás la página", detail: "Entrá a la página de empresa y confirmá que tu usuario figura como administrador. Sin eso, el paso 4 no se puede completar.", where: "linkedin.com" },
-      { title: "Creá una app", detail: "En el portal de desarrolladores, creá una app y asociala a la página de empresa. Te va a pedir un logo y una URL de política de privacidad.", where: "developer.linkedin.com" },
-      { title: "Pedí el producto de publicación", detail: "Dentro de la app, en la lista de productos, solicitá el que permite publicar como la organización. Se aprueba por separado del alta de la app.", where: "developer.linkedin.com" },
-      { title: "Verificá la app con la página", detail: "LinkedIn genera un enlace de verificación que tiene que abrir un administrador de la página. Si el paso 1 no estaba, se traba acá." },
-      { title: "Configurá la URL de retorno", detail: "Agregá como URL autorizada la de este sistema seguida de /api/integrations/linkedin/callback." },
-      { title: "Copiá las credenciales", detail: "De la pestaña de autenticación salen el identificador y el secreto de cliente. Van a Vercel como variables de entorno, nunca a un archivo del repositorio ni a un chat." },
-    ],
-    credentials: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
-    blocker: "El permiso para publicar se solicita aparte del alta de la app: tener la app no alcanza.",
-  },
   {
     platform: "instagram",
     label: "Instagram",
@@ -117,6 +107,28 @@ export const INTEGRATIONS: IntegrationSpec[] = [
     ],
     credentials: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
     blocker: "La cuota inicial es el límite real: no es cuestión de permisos sino de cuántas subidas por día entran.",
+  },
+  {
+    platform: "linkedin",
+    label: "LinkedIn",
+    accountType: "Página de empresa donde seas administrador",
+    waiting: "El acceso para publicar como pagina no se resuelve en dias: pasa por el programa de partners.",
+    steps: [
+      { title: "Verificá que administrás la página", detail: "Entrá a la página de empresa y confirmá que tu usuario figura como administrador. Sin eso, el paso 4 no se puede completar.", where: "linkedin.com" },
+      { title: "Creá una app", detail: "En el portal de desarrolladores, creá una app y asociala a la página de empresa. Te va a pedir un logo y una URL de política de privacidad.", where: "developer.linkedin.com" },
+      { title: "Pedí el producto de publicación", detail: "Dentro de la app, en la lista de productos, solicitá el que permite publicar como la organización. Se aprueba por separado del alta de la app.", where: "developer.linkedin.com" },
+      { title: "Verificá la app con la página", detail: "LinkedIn genera un enlace de verificación que tiene que abrir un administrador de la página. Si el paso 1 no estaba, se traba acá." },
+      { title: "Configurá la URL de retorno", detail: "Agregá como URL autorizada la de este sistema seguida de /api/integrations/linkedin/callback." },
+      { title: "Copiá las credenciales", detail: "De la pestaña de autenticación salen el identificador y el secreto de cliente. Van a Vercel como variables de entorno, nunca a un archivo del repositorio ni a un chat." },
+    ],
+    credentials: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
+    // Verified in the portal, not recalled: with the app created and the page verified, the
+    // Community Management API -- the product that grants w_organization_social -- has its
+    // request button disabled. It is Development Tier, and those are not self-serve: they are
+    // granted through LinkedIn's partner programme, which is a commercial process rather than a
+    // form. The only self-serve product that posts is "Share on LinkedIn", and it posts as the
+    // person, not the page.
+    blocker: "Publicar como pagina esta detras del programa de partners de LinkedIn, no de un formulario. Lo unico de autoservicio publica desde el perfil personal, que no es lo mismo.",
   },
 ];
 

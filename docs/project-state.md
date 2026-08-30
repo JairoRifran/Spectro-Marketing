@@ -101,8 +101,15 @@ When content approval is automatic, a piece that passes the deterministic gate i
 and recorded as `content.approved_by_policy`. **Never write it as an ordinary approval** — that
 would file a piece nobody read alongside a piece someone signed.
 
-LinkedIn is the furthest along and is the right one to finish first: fastest review, and the only
-channel with content already produced.
+LinkedIn is the furthest along in code and the **wrong one to finish first**, which was learned by
+trying. The app exists and the page is verified, but the Community Management API -- the product
+granting `w_organization_social` -- has its request button disabled: it is Development Tier, and
+those are granted through LinkedIn's partner programme, a commercial process rather than a form.
+The only self-serve product that posts is "Share on LinkedIn", and it posts as the person.
+
+The owner declined personal posting, so this channel is parked until someone decides whether the
+partner programme is worth pursuing. The other four gate publishing behind an app review, which is
+slow but finishable by one person, and the catalogue is ordered accordingly.
 
 - OAuth start and callback: **built**. State is signed and expiring; the callback trusts nothing
   in the query string but the code.

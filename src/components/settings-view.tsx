@@ -94,9 +94,12 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
         dando de alta la app.
       </p>
       <p>
-        Los canales están en el orden en que conviene hacerlos. LinkedIn primero: es el más rápido de
-        habilitar y el único que ya tiene contenido generado esperando. Instagram y Facebook comparten
-        una misma app y una misma revisión de Meta, así que se hacen juntos o no se hace ninguno.
+        Los canales están en el orden en que conviene hacerlos, que no es el que uno supone. LinkedIn
+        quedó último: publicar como página de empresa pasa por su programa de partners, que es un
+        trámite comercial y no un formulario — lo comprobamos con la app ya creada y la página
+        verificada. Los otros cuatro cierran con una revisión que una persona puede completar sola.
+        Instagram y Facebook comparten una misma app y una misma revisión de Meta, así que se hacen
+        juntos o no se hace ninguno.
       </p>
       <p>
         Las credenciales que salen de cada guía van como variables de entorno en el servidor, igual que

@@ -92,9 +92,18 @@ describe("the channel catalogue tells the truth about what is missing", () => {
     }
   });
 
-  it("puts the reachable channel first", () => {
-    // LinkedIn is the fastest to enable and the only one with content already waiting.
-    expect(INTEGRATIONS[0]!.platform).toBe("linkedin");
+  it("does not put the partner-gated channel first", () => {
+    // LinkedIn was first here on the belief that its review was the lightest. Opening the portal
+    // disproved it: with the app created and the page verified, the product that grants posting
+    // as a company page is not self-serve at all. The ones a person can finish alone go first.
+    expect(INTEGRATIONS[0]!.platform).not.toBe("linkedin");
+    expect(INTEGRATIONS.at(-1)!.platform).toBe("linkedin");
+  });
+
+  it("says what actually blocks LinkedIn, not what was assumed", () => {
+    const linkedin = INTEGRATIONS.find((item) => item.platform === "linkedin")!;
+    expect(linkedin.blocker).toMatch(/partners/i);
+    expect(linkedin.blocker).not.toMatch(/se solicita aparte del alta/);
   });
 
   it("stores no credential anywhere near the application's own database", () => {
