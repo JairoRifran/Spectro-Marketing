@@ -142,3 +142,14 @@ describe("a control that will not act has to say why", () => {
     expect(current).toContain('document.getElementById("objective-select")?.focus()');
   });
 });
+
+describe("a failed insert says what the database said", () => {
+  const route = read("../../../src/app/api/campaigns/route.ts");
+
+  it("carries the code rather than one sentence for every cause", () => {
+    // "No pudimos crear la campaña" fits a missing column, a constraint, a permission and a typo
+    // equally well, so it identifies none of them.
+    expect(route).toContain("error?.code");
+    expect(route).not.toMatch(/message:"No pudimos crear la campaña\."/);
+  });
+});
