@@ -127,22 +127,22 @@ describe("what the portals ask of us", () => {
   it("derives the callback from the stable production domain, not the deployment", () => {
     // VERCEL_URL points at one deployment and changes on every push, so an app registered
     // against it breaks on the next one.
-    expect(callbackUrl("linkedin", { APP_URL: "https://spectro.example" } as NodeJS.ProcessEnv))
+    expect(callbackUrl("linkedin", { APP_URL: "https://spectro.example" } as unknown as NodeJS.ProcessEnv))
       .toBe("https://spectro.example/api/integrations/linkedin/callback");
-    expect(appOrigin({ VERCEL_PROJECT_PRODUCTION_URL: "spectro.vercel.app" } as NodeJS.ProcessEnv))
+    expect(appOrigin({ VERCEL_PROJECT_PRODUCTION_URL: "spectro.vercel.app" } as unknown as NodeJS.ProcessEnv))
       .toBe("https://spectro.vercel.app");
-    expect(appOrigin({ APP_URL: "https://spectro.example/" } as NodeJS.ProcessEnv)).toBe("https://spectro.example");
+    expect(appOrigin({ APP_URL: "https://spectro.example/" } as unknown as NodeJS.ProcessEnv)).toBe("https://spectro.example");
   });
 
   it("gives every channel a callback of its own", () => {
-    const urls = INTEGRATIONS.map((item) => callbackUrl(item.platform, { APP_URL: "https://x.test" } as NodeJS.ProcessEnv));
+    const urls = INTEGRATIONS.map((item) => callbackUrl(item.platform, { APP_URL: "https://x.test" } as unknown as NodeJS.ProcessEnv));
     expect(new Set(urls).size).toBe(urls.length);
   });
 
   it("offers the fields these forms refuse to submit without", () => {
     // Discovering that a privacy policy is mandatory at the end of the form is how an afternoon
     // gets lost.
-    const labels = commonPortalFields({ APP_URL: "https://x.test" } as NodeJS.ProcessEnv).map((field) => field.label);
+    const labels = commonPortalFields({ APP_URL: "https://x.test" } as unknown as NodeJS.ProcessEnv).map((field) => field.label);
     expect(labels).toContain("Política de privacidad");
     expect(labels).toContain("Términos de uso");
   });
