@@ -6,6 +6,7 @@ import { PublishingMode } from "@/components/publishing-mode";
 import { INTEGRATIONS } from "@/server/integrations/catalog";
 import { callbackUrl, commonPortalFields } from "@/server/integrations/urls";
 import { IntegrationCredentials } from "@/components/integration-credentials";
+import { IntegrationAccount } from "@/components/integration-account";
 import { CopyField } from "@/components/copy-field";
 
 const tabs=[['/settings/company','Empresa'],['/settings/brand','Marca'],['/settings/team','Equipo'],['/settings/integrations','Integración'],['/settings/automation','Automatización']] as const;
@@ -58,6 +59,10 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
                 a redirect URI retyped with a trailing slash fails hours later with an error that
                 names nothing. */}
             <CopyField label="URL de retorno (redirect URI)" value={callbackUrl(spec.platform)}/>
+            {/* Naming the page is a different question from authorising the app, and one LinkedIn
+                account can administer several. Picking one silently is how a campaign lands on
+                the wrong company's feed. */}
+            {spec.platform==="linkedin"&&<IntegrationAccount platform={spec.platform} current={row?.accountId??null} canEdit={data.role==="owner"||data.role==="admin"} demo={data.mode==="demo"}/>}
             <dl className="integration-meta">
               <div><dt>Termina en</dt><dd>{spec.credentials.join(" · ")}</dd></div>
               <div><dt>Espera</dt><dd>{spec.waiting}</dd></div>

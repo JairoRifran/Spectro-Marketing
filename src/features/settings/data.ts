@@ -8,7 +8,7 @@ export type SettingsData={mode:"demo"|"live";orgName:string;role:string;company:
   publishingMode:"human_review"|"autonomous";
   /** Whether each piece waits for a person before it is finished. Independent of publishing. */
   contentApprovalMode:"human"|"automatic";
-  integrations:Array<{platform:string;status:string;handle:string|null;accountName:string|null;connectedAt:string|null;lastError:string|null}>;
+  integrations:Array<{platform:string;status:string;handle:string|null;accountName:string|null;connectedAt:string|null;lastError:string|null;accountId:string|null}>;
   /** Whether each channel has an app behind it, and whose. Never the secret itself. */
   credentials:Record<string,{configured:boolean;source:"organization"|"platform"|null}>};
 
@@ -26,7 +26,7 @@ export async function getSettingsData():Promise<SettingsData>{
     ctx.db.from("schedules").select("id,name,status,cron_expression,timezone,last_run_at,next_run_at").eq("organization_id",ctx.orgId).order("name"),
     ctx.db.from("tasks").select("status,lease_expires_at").eq("organization_id",ctx.orgId).in("status",["queued","running"]),
     ctx.db.from("worker_health").select("last_dispatch_at,last_successful_run_at,last_failed_run_at").eq("worker_name","dispatcher").maybeSingle(),
-    ctx.db.from("social_integrations").select("platform,status,account_handle,account_name,connected_at,last_error").eq("organization_id",ctx.orgId),
+    ctx.db.from("social_integrations").select("platform,status,account_handle,account_name,connected_at,last_error,external_account_id").eq("organization_id",ctx.orgId),
   ]);
   const org=organization.data;const taskRows=tasks.data??[];const now=Date.now();
   return{mode:"live",orgName:org?.name??ctx.orgName,role:ctx.role,company:{industry:org?.industry??"—",country:org?.country??"—",language:org?.primary_language??"—",timezone:org?.timezone??"—",description:org?.description??""},brand:brand.data?{name:brand.data.name,tone:brand.data.tone_of_voice??"—",preferred:brand.data.preferred_words??[],forbiddenClaims:brand.data.forbidden_claims??[],colors:Array.isArray(brand.data.colors)?brand.data.colors.filter((item):item is string=>typeof item==="string"):[]}:null,members:(members.data??[]).map(member=>({id:member.user_id,name:(member.profiles as unknown as {full_name:string|null}|null)?.full_name??"Miembro",role:member.role})),schedules:(schedules.data??[]).map(schedule=>({id:schedule.id,name:schedule.name,status:schedule.status,cron:schedule.cron_expression,timezone:schedule.timezone,lastRun:schedule.last_run_at,nextRun:schedule.next_run_at})),worker:{enabled:automationIsEnabled(),lastDispatch:health.data?.last_dispatch_at??null,lastSuccess:health.data?.last_successful_run_at??null,lastFailure:health.data?.last_failed_run_at??null,queued:taskRows.filter(task=>task.status==="queued").length,running:taskRows.filter(task=>task.status==="running").length,stale:taskRows.filter(task=>task.status==="running"&&task.lease_expires_at&&new Date(task.lease_expires_at).getTime()<now).length},
@@ -34,7 +34,7 @@ export async function getSettingsData():Promise<SettingsData>{
     // do not know" is that nobody said anything may go out on its own.
     publishingMode:(org as {publishing_mode?:string}|null)?.publishing_mode==="autonomous"?"autonomous":"human_review",
     contentApprovalMode:(org as {content_approval_mode?:string}|null)?.content_approval_mode==="automatic"?"automatic":"human",
-    integrations:(integrations.data??[]).map(row=>({platform:row.platform,status:row.status,handle:row.account_handle,accountName:row.account_name,connectedAt:row.connected_at,lastError:row.last_error})),
+    integrations:(integrations.data??[]).map(row=>({platform:row.platform,status:row.status,handle:row.account_handle,accountName:row.account_name,connectedAt:row.connected_at,lastError:row.last_error,accountId:row.external_account_id})),
     // Resolved server-side, where the secret can be read and then not returned: the screen learns
     // that an app exists and whose it is, never what it is.
     credentials:Object.fromEntries(await Promise.all(SUPPORTED_PLATFORMS.map(async platform=>[platform,await credentialStatus(ctx.orgId,platform)] as const)))};

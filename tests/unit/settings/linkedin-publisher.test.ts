@@ -93,3 +93,39 @@ describe("the gates before anything leaves", () => {
     expect(route).toContain('decided_by_type: "user"');
   });
 });
+
+describe("the last step, in the interface", () => {
+  const account = read("../../../src/components/integration-account.tsx");
+  const action = read("../../../src/components/publish-action.tsx");
+  const page = read("../../../src/app/content/page.tsx");
+  const accountRoute = read("../../../src/app/api/integrations/[platform]/account/route.ts");
+
+  it("asks for the page number, not a pasted URL", () => {
+    // The author URN is built from the id; a whole URL stored here cannot build one.
+    expect(accountRoute).toMatch(/regex\(\/\^\\d\{4,20\}\$\//);
+    expect(account).toMatch(/S\u00f3lo el n\u00famero/);
+  });
+
+  it("shows where to find it rather than assuming the reader knows", () => {
+    expect(account).toContain("linkedin.com/company/");
+    expect(account).toContain("admin");
+  });
+
+  it("offers publishing only after approval", () => {
+    expect(page).toContain('item.status === "approved" || item.publishedUrl');
+  });
+
+  it("names the page in the confirmation", () => {
+    // A confirmation that only says "are you sure?" is one people learn to click through.
+    expect(action).toContain("en la página <b>{page}</b>");
+    expect(action).toMatch(/no la borra de quien ya la vio/);
+  });
+
+  it("refuses to offer publishing with no page set", () => {
+    expect(action).toContain("if (!page)");
+  });
+
+  it("shows the published post instead of the button once it is out", () => {
+    expect(action).toContain("if (publishedUrl)");
+  });
+});

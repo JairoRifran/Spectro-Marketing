@@ -260,6 +260,8 @@ export async function getContentOperationalCounts() {
 
 export type GalleryItem = ContentListItem & {
   variant: PlatformContentVariant | null;
+  /** Set once this exact version actually went out, which is what makes publishing visibly final. */
+  publishedUrl: string | null;
   /** Short-lived links to whatever audio the piece already has. */
   audioUrl: string | null;
   musicUrl: string | null;
@@ -274,22 +276,33 @@ export type GalleryItem = ContentListItem & {
  * A piece with no variant yet is kept in the result rather than dropped: "planned but not
  * written" is a real state, and hiding it would misreport how much exists.
  */
-export async function getContentGallery(filters: ContentFilters): Promise<Omit<Awaited<ReturnType<typeof getContentList>>, "items"> & { items: GalleryItem[] }> {
+export async function getContentGallery(filters: ContentFilters): Promise<
+  Omit<Awaited<ReturnType<typeof getContentList>>, "items"> & {
+    items: GalleryItem[];
+    /** The company page publishing goes to, so a card can name it before it sends anything. */
+    publishPage: string | null;
+  }
+> {
   const list = await getContentList(filters);
-  if (list.items.length === 0) return { ...list, items: [] };
+  if (list.items.length === 0) return { ...list, publishPage: null, items: [] };
 
   if (list.mode === "demo") {
-    return { ...list, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null, audioUrl: null, musicUrl: null, images: {} })) };
+    return { ...list, publishPage: null, items: list.items.map((item) => ({ ...item, variant: DEMO_PIECES.find((piece) => piece.id === item.id)?.variant ?? null, publishedUrl: null, audioUrl: null, musicUrl: null, images: {} })) };
   }
 
   const ctx = await getOrganizationContext();
-  if (!ctx) return { ...list, items: list.items.map((item) => ({ ...item, variant: null, audioUrl: null, musicUrl: null, images: {} })) };
+  if (!ctx) return { ...list, publishPage: null, items: list.items.map((item) => ({ ...item, variant: null, publishedUrl: null, audioUrl: null, musicUrl: null, images: {} })) };
 
   const ids = list.items.map((item) => item.id);
-  const [{ data }, assets] = await Promise.all([
+  const [{ data }, assets, publications, integration] = await Promise.all([
     ctx.db.from("content_variants").select("content_item_id,version,payload").eq("organization_id", ctx.orgId).in("content_item_id", ids),
     ctx.db.from("content_assets").select("content_item_id,content_version,storage_path,slot,kind").eq("organization_id", ctx.orgId).in("content_item_id", ids),
+    // What already went out. Read per version, because a revision is a new piece to publish even
+    // when the previous one is on the page.
+    ctx.db.from("content_publications").select("content_item_id,content_version,external_url").eq("organization_id", ctx.orgId).eq("status", "published").in("content_item_id", ids),
+    ctx.db.from("social_integrations").select("external_account_id").eq("organization_id", ctx.orgId).eq("platform", "linkedin").maybeSingle(),
   ]);
+  const publishedByKey = new Map((publications.data ?? []).map(row => [`${row.content_item_id}:${row.content_version}`, row.external_url as string | null]));
 
   // One signing call for the whole page. Signing per card would be a storage round trip per
   // piece, which is what kept the sequence collapsed and silent until now.
@@ -323,11 +336,12 @@ export async function getContentGallery(filters: ContentFilters): Promise<Omit<A
     return {
       ...item,
       variant: (chosen?.payload as PlatformContentVariant | undefined) ?? null,
+      publishedUrl: publishedByKey.get(`${item.id}:${item.currentVersion}`) ?? null,
       audioUrl: assetFor("voiceover"),
       musicUrl: assetFor("music"),
       images,
     };
   });
 
-  return { ...list, items };
+  return { ...list, publishPage: integration.data?.external_account_id ?? null, items };
 }

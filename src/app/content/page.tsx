@@ -9,6 +9,7 @@ import { composeFrames } from "@/server/media/compose";
 import { SPECTRO_IDENTITY } from "@/server/media/identity";
 import { AssembledPreview } from "@/components/assembled-preview";
 import { ContentActions } from "@/components/content-actions";
+import { PublishAction } from "@/components/publish-action";
 import { intendedTimings } from "@/server/media/timing";
 import { buildNarration } from "@/server/media/narration";
 import { buildMusicBrief } from "@/server/media/soundtrack";
@@ -223,6 +224,19 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                               different screen to say yes or no puts the two halves of one
                               judgement in two places, and the half that carries the evidence
                               is this one. */}
+                          {/* The last step, and the only one that cannot be undone from inside
+                              this product. It appears after approval, never before. */}
+                          {item.platform === "linkedin" && (item.status === "approved" || item.publishedUrl) && (
+                            <div className="gallery-decision">
+                              <PublishAction
+                                contentItemId={item.id}
+                                page={data.publishPage}
+                                demo={data.mode === "demo"}
+                                publishedUrl={item.publishedUrl}
+                              />
+                            </div>
+                          )}
+
                           {(item.status === "waiting_approval" || item.status === "needs_revision") && (
                             <div className="gallery-decision">
                               <ContentActions

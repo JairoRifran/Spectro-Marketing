@@ -122,9 +122,10 @@ channel with content already produced.
 1. A LinkedIn developer app, created by a person, with `w_organization_social` granted. Nothing
    in this repository can do this.
 2. `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` as server environment variables.
-3. The company page's numeric id, stored as `social_integrations.external_account_id`. **There is
-   no UI for this yet** and the publish route returns `no_page` without it.
-4. A publish button on an approved piece. **Not built.**
+3. The company page's numeric id, stored as `social_integrations.external_account_id`. There is a
+   field for it on the channel card; it is the number in `linkedin.com/company/<id>/admin`.
+4. Nothing else. The publish button is on every approved LinkedIn piece, it names the page in its
+   confirmation, and it shows the live post once one exists.
 
 ## Standing constraints
 
