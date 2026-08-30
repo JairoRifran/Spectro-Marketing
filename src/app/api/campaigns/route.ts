@@ -1,13 +1,14 @@
 import { getOrganizationContext } from "@/features/organizations/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { campaignCreateSchema } from "@/server/campaigns/schemas";
+import { validationMessage } from "@/server/validation-message";
 import { runCampaignBrainForOrganization } from "@/server/campaigns/workflow";
 import { publicError } from "@/server/errors";
 
 function slugify(value:string){return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,70)||"campaign";}
 
 export async function POST(request:Request){
-  const parsed=campaignCreateSchema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return Response.json({error:"validation",issues:parsed.error.flatten(),message:"Revisá los datos de campaña."},{status:400});
+  const parsed=campaignCreateSchema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return Response.json({error:"validation",issues:parsed.error.flatten(),message:validationMessage(parsed.error)},{status:400});
   const context=await getOrganizationContext();if(!context)return Response.json({error:"organization_required",message:"Necesitás una organización activa."},{status:401});if(context.role==="viewer")return Response.json({error:"forbidden",message:"Tu rol es de sólo lectura."},{status:403});
   const{data:objective}=await context.db.from("objectives").select("id,title").eq("id",parsed.data.objectiveId).eq("organization_id",context.orgId).maybeSingle();if(!objective)return Response.json({error:"objective_not_found",message:"El objetivo no pertenece a esta organización."},{status:404});
   const name=parsed.data.name||`Campaña: ${objective.title}`;const db=createAdminClient();const slug=`${slugify(name)}-${crypto.randomUUID().slice(0,8)}`;

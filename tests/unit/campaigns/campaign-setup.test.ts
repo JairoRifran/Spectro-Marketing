@@ -71,3 +71,30 @@ describe("which channels a campaign may consider", () => {
     expect(form).toMatch(/Valentina evalúa las cinco redes y decide/);
   });
 });
+
+describe("a validation error has to say which box to fix", () => {
+  const message = read("../../../src/server/validation-message.ts");
+  const objectivesRoute = read("../../../src/app/api/objectives/route.ts");
+  const campaignsRoute = read("../../../src/app/api/campaigns/route.ts");
+
+  it("names the field in the words the screen uses", () => {
+    // "Too big: expected string to have <=160 characters" describes the rule and never which of a
+    // dozen inputs broke it. Somebody reading "Objetivo" cannot know it is `title` underneath.
+    expect(message).toContain("FIELD_LABELS");
+    expect(message).toContain('title: "El objetivo"');
+    expect(message).toMatch(/máximo \$\{issue\.maximum\} caracteres/);
+  });
+
+  it("is used by both routes the form talks to", () => {
+    expect(objectivesRoute).toContain("validationMessage(parsed.error)");
+    expect(campaignsRoute).toContain("validationMessage(parsed.error)");
+    // The old generic sentence said nothing about what to change.
+    expect(campaignsRoute).not.toContain("Revisá los datos de campaña.");
+  });
+
+  it("stops the field accepting more than it will keep", () => {
+    // A form that takes more than it stores is a form that wastes the typing.
+    expect(form).toContain("maxLength={160}");
+    expect(form).toContain("{draft.title.length}/160");
+  });
+});

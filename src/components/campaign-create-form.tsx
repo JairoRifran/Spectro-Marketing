@@ -106,7 +106,13 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
           ) : (
             <div className="objective-draft">
               <p>Un objetivo necesita una medida y un número. Sin ellos es un deseo, y Campaign Brain los usa para argumentar la estrategia.</p>
-              <label>Objetivo<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Aumentar registros calificados un 30%" /></label>
+              {/* The limit is enforced by the input rather than discovered on submit: a form that
+                  accepts more than it will keep is a form that wastes the typing. */}
+              <label>
+                Objetivo
+                <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={160} placeholder="Aumentar registros calificados un 30%" />
+                <small>{draft.title.length}/160 · un titular, no una descripción. El detalle va en la audiencia y las restricciones.</small>
+              </label>
               <div className="field-grid">
                 <label>Métrica<input value={draft.metric} onChange={(event) => setDraft({ ...draft, metric: event.target.value })} placeholder="Registros calificados" /></label>
                 <label>Meta<input value={draft.target} onChange={(event) => setDraft({ ...draft, target: event.target.value })} type="number" min="0" step="any" placeholder="1300" /></label>
@@ -149,7 +155,7 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
           <h2>Contexto opcional</h2>
           <p>Podés orientar a Spectro sin definir la estrategia por adelantado.</p>
           <div className="field-grid">
-            <label>Nombre de campaña<input name="name" placeholder="Spectro puede proponerlo" /></label>
+            <label>Nombre de campaña<input name="name" maxLength={160} placeholder="Spectro puede proponerlo" /></label>
             <label>Presupuesto estimado<input name="budget" type="number" min="0" step="0.01" placeholder="Opcional" /></label>
             <label>Inicio<input name="startDate" type="date" /></label>
             <label>Fin<input name="endDate" type="date" /></label>

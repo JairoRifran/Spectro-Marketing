@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getOrganizationContext } from "@/features/organizations/context";
 import { publicError } from "@/server/errors";
+import { validationMessage } from "@/server/validation-message";
 
 // Creating an objective.
 //
@@ -26,7 +27,9 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return Response.json({ error: "validation", message: parsed.error.issues[0]?.message ?? "Datos incompletos" }, { status: 400 });
+    // Named, because "Too big: expected string to have <=160 characters" is a puzzle on a form
+    // with a dozen inputs: it says the rule and never which box broke it.
+    return Response.json({ error: "validation", message: validationMessage(parsed.error) }, { status: 400 });
   }
 
   const context = await getOrganizationContext();
