@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { INTEGRATIONS } from "@/server/integrations/catalog";
 import { SUPPORTED_PLATFORMS } from "@/server/content/platforms";
+import { appOrigin, callbackUrl, commonPortalFields } from "@/server/integrations/urls";
 
 // Publishing to a real audience under a brand's own name does not come back, and the switch that
 // removes the person from that loop is the most consequential control in the product. These
@@ -119,5 +120,37 @@ describe("the migration matches the schema it is written against", () => {
   it("can be re-run after a failed attempt", () => {
     // A migration nobody dares run twice is a migration nobody dares fix.
     expect(migration).toContain("exception when duplicate_object then null");
+  });
+});
+
+describe("what the portals ask of us", () => {
+  it("derives the callback from the stable production domain, not the deployment", () => {
+    // VERCEL_URL points at one deployment and changes on every push, so an app registered
+    // against it breaks on the next one.
+    expect(callbackUrl("linkedin", { APP_URL: "https://spectro.example" } as NodeJS.ProcessEnv))
+      .toBe("https://spectro.example/api/integrations/linkedin/callback");
+    expect(appOrigin({ VERCEL_PROJECT_PRODUCTION_URL: "spectro.vercel.app" } as NodeJS.ProcessEnv))
+      .toBe("https://spectro.vercel.app");
+    expect(appOrigin({ APP_URL: "https://spectro.example/" } as NodeJS.ProcessEnv)).toBe("https://spectro.example");
+  });
+
+  it("gives every channel a callback of its own", () => {
+    const urls = INTEGRATIONS.map((item) => callbackUrl(item.platform, { APP_URL: "https://x.test" } as NodeJS.ProcessEnv));
+    expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it("offers the fields these forms refuse to submit without", () => {
+    // Discovering that a privacy policy is mandatory at the end of the form is how an afternoon
+    // gets lost.
+    const labels = commonPortalFields({ APP_URL: "https://x.test" } as NodeJS.ProcessEnv).map((field) => field.label);
+    expect(labels).toContain("Política de privacidad");
+    expect(labels).toContain("Términos de uso");
+  });
+
+  it("points those at pages that exist", () => {
+    // A URL in a guide that returns 404 is worse than no URL at all.
+    for (const path of ["privacidad", "terminos"]) {
+      expect(() => readFileSync(new URL(`../../../src/app/legal/${path}/page.tsx`, import.meta.url))).not.toThrow();
+    }
   });
 });

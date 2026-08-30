@@ -435,3 +435,18 @@
 .mode-confirm input{padding:8px 10px;border:1px solid #d8ded9;border-radius:8px;font:inherit}
 .mode-actions{display:flex;gap:8px}
 .mode-error{color:#a3352c}
+
+/* Values that have to arrive somewhere else exactly. */
+.copy-field{display:grid;grid-template-columns:1fr auto;gap:6px 8px;align-items:center;margin:0 0 10px;padding:8px 10px;background:#f7f9f8;border-radius:8px}
+.copy-field .copy-label{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#6b7a76}
+.copy-field code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all}
+.copy-field button{display:inline-flex;align-items:center;gap:5px;border:1px solid #d8ded9;background:#fff;border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.copy-field button:hover{border-color:#16a47a;color:#0f5d45}
+.portal-fields{display:grid;gap:4px;margin-bottom:10px}
+
+/* Legal pages: plain documents, readable without the app shell around them. */
+.legal-page{max-width:720px;margin:0 auto;padding:48px 24px 80px;line-height:1.6}
+.legal-page h1{margin:0 0 12px}
+.legal-page h2{margin:28px 0 6px;font-size:16px}
+.legal-page p{margin:0 0 12px;color:#3d4a47}
+.legal-note{padding:10px 12px;background:#fdf7f0;border:1px solid #e8c9a8;border-radius:8px;font-size:13px}

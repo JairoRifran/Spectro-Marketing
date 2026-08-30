@@ -4,6 +4,8 @@ import { WorkspacePage,StatusPill } from "@/components/workspace-page";
 import { getSettingsData } from "@/features/settings/data";
 import { PublishingMode } from "@/components/publishing-mode";
 import { INTEGRATIONS } from "@/server/integrations/catalog";
+import { callbackUrl, commonPortalFields } from "@/server/integrations/urls";
+import { CopyField } from "@/components/copy-field";
 
 const tabs=[['/settings/company','Empresa'],['/settings/brand','Marca'],['/settings/team','Equipo'],['/settings/integrations','Integración'],['/settings/automation','Automatización']] as const;
 export async function SettingsView({section}:{section:"company"|"brand"|"team"|"automation"|"integrations"}){const data=await getSettingsData();const connected=data.integrations.filter(item=>item.status==="connected");return <DashboardShell activePath={`/settings/${section}`} organizationName={data.orgName} demo={data.mode==="demo"}><WorkspacePage eyebrow="CONFIGURACIÓN" title="Workspace" description={`Datos del workspace seleccionado · permiso ${data.role}.`}><nav className="settings-tabs">{tabs.map(([href,label])=><Link className={href.endsWith(section)?"active":""} href={href} key={href}>{label}</Link>)}</nav>{section==="company"&&<div className="settings-panels"><Panel title="Información de empresa"><Fields items={[["Nombre",data.orgName],["Industria",data.company.industry],["País",data.company.country],["Idioma",data.company.language],["Timezone",data.company.timezone]]}/></Panel><Panel title="Perfil operativo"><p>{data.company.description||"Aún no existe una descripción operativa."}</p></Panel></div>}{section==="brand"&&<div className="settings-panels"><Panel title="Brand Kit">{data.brand?<Fields items={[["Marca",data.brand.name],["Tono",data.brand.tone],["Palabras preferidas",data.brand.preferred.join(", ")||"—"],["Claims prohibidos",data.brand.forbiddenClaims.join(", ")||"—"]]}/>:<p>No hay Brand Kit configurado.</p>}</Panel><Panel title="Paleta"><div className="swatches">{data.brand?.colors.length?data.brand.colors.map(color=><i style={{background:color}} key={color}/>):<p>Sin colores configurados.</p>}</div></Panel></div>}{section==="team"&&<div className="settings-panels"><Panel title="Miembros"><div className="simple-list">{data.members.map(member=><div key={member.id}><div><strong>{member.name}</strong><small>Miembro del workspace</small></div><StatusPill value={member.role}/></div>)}</div></Panel><Panel title="Roles"><p>Owner controla la organización; admin gestiona configuración; member opera trabajo y conocimiento; viewer es solo lectura.</p></Panel></div>}{section==="integrations"&&<div className="settings-panels">
@@ -31,6 +33,10 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
                 {step.where&&<em>en {step.where}</em>}
               </li>)}
             </ol>
+            {/* The value the portal matches character for character. Shown to be copied, because
+                a redirect URI retyped with a trailing slash fails hours later with an error that
+                names nothing. */}
+            <CopyField label="URL de retorno (redirect URI)" value={callbackUrl(spec.platform)}/>
             <dl className="integration-meta">
               <div><dt>Termina en</dt><dd>{spec.credentials.join(" · ")}</dd></div>
               <div><dt>Espera</dt><dd>{spec.waiting}</dd></div>
@@ -39,6 +45,20 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
           </article>;
         })}
       </div>
+    </Panel>
+    <Panel title="Datos de este sistema que te van a pedir">
+      {/* Every one of these guides ends at a form asking for URLs that belong to us. Stopping
+          just short of them is the least useful place to stop: the reader has done the work, is
+          looking at the field, and has to guess. */}
+      <div className="portal-fields">
+        {commonPortalFields().map(field=><CopyField key={field.label} label={field.label} value={field.value}/>)}
+      </div>
+      <p className="integration-blocker">
+        La política de privacidad y los términos son obligatorios para presentar la app en Meta y en
+        LinkedIn: las dos plataformas rechazan el formulario sin URLs alcanzables. Las páginas ya
+        existen y describen con precisión lo que el sistema hace con los datos, pero están pendientes
+        de revisión legal — conviene que las lea alguien calificado antes de una presentación formal.
+      </p>
     </Panel>
     <Panel title="Por qué todavía no hay un botón de conectar">
       <p>
