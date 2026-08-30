@@ -15,6 +15,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-only and autonomous execution disabled by default.
 - Before milestone closeout run lint, typecheck, unit/integration tests, build, and Playwright; PASS requires real Supabase and Vercel evidence. Cron must remain inactive for M02.1.
 
+# Where the project actually is
+
+Before changing anything, read `docs/project-state.md`. It records what runs on a real model,
+what is built but never executed, the sixty-second constraint that shapes every design here, and
+the failure modes that have already cost days -- each one found in production, none of them
+guessable from the code.
+
 # Spectro engineering guide
 
 Spectro is a multi-tenant marketing operating system. PostgreSQL is the source of truth. Autonomous behavior uses persistent events, schedules, tasks, short workers, leases, retries, and idempotency—not permanent Node processes. The bounded Vercel dispatcher is awakened externally.
