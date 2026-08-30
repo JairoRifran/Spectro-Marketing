@@ -491,3 +491,48 @@
 .platform-choices label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid #d8ded9;border-radius:999px;font-size:13px;cursor:pointer}
 .platform-choices label.is-on{border-color:#16a47a;background:#eef7f3;color:#0f5d45}
 .platform-choices input{margin:0}
+
+/* ── The rail, with more life in it ─────────────────────────────────────────────────────────
+   Every effect here is tied to a state that means something. Motion on a card that is doing
+   nothing would be decoration, and worse, it would make idle look busy — which is the exact
+   confusion the queued/working split was introduced to remove. */
+
+/* What the agent is on, on the card. Two lines, then it truncates: the full text is in the title
+   attribute and in the panel below, and a card that grows to fit a long task title pushes the
+   whole rail out of shape. */
+.pipeline-task{margin-top:4px;font-size:9px;line-height:1.35;color:#5c6a66;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:14ch;opacity:.95}
+.pipeline-stage.is-working .pipeline-task{color:#0f6b50}
+
+/* The working card lifts out of the rail. It is the one thing on screen that is happening. */
+.pipeline-stage.is-working>button{background:linear-gradient(180deg,#f4fbf8,#ffffff);border-color:#cbe9dc;box-shadow:0 6px 18px -10px rgba(16,120,90,.45)}
+.pipeline-stage>button{transform:translateY(0);transition:background .2s ease,border-color .2s ease,box-shadow .25s ease,transform .2s ease}
+.pipeline-stage>button:hover{transform:translateY(-2px);box-shadow:0 6px 16px -12px rgba(20,40,35,.5)}
+
+/* A slow sweep across the working card: enough to read as alive, not enough to pull the eye off
+   the words. */
+.pipeline-stage.is-working>button::after{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%);background-size:280% 100%;animation:pipeline-sweep 2.6s ease-in-out infinite}
+@keyframes pipeline-sweep{from{background-position:140% 0}to{background-position:-40% 0}}
+
+/* Queued is waiting its turn, so it is drawn as an outline rather than a pulse. Nothing is
+   happening there and it must not look like it is. */
+.pipeline-stage.is-queued .pipeline-face{box-shadow:0 0 0 4px #fff,0 0 0 6px #e0e6e4}
+.pipeline-stage.is-queued .pipeline-state{color:#7d8a87}
+.pipeline-stage.is-queued>button{border-style:dashed;border-color:#e0e6e4}
+
+/* The tick lands rather than appearing, which is the only moment worth a flourish: it is the one
+   time a stage changes for good. */
+.pipeline-face-tick{animation:pipeline-tick .38s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes pipeline-tick{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* A finished connector fills in, so progress reads along the rail without counting faces. */
+.pipeline-stage.is-done::before{background:linear-gradient(90deg,#9fd3ba,#16a47a)}
+
+/* Everything above is motion. Some people have it turned off at the system level, and a product
+   that ignores that setting is telling them their preference does not count. */
+@media (prefers-reduced-motion: reduce){
+  .pipeline-stage.is-working::before,
+  .pipeline-stage.is-working>button::after,
+  .pipeline-stage.is-working .pipeline-face,
+  .pipeline-face-tick{animation:none}
+  .pipeline-stage>button,.pipeline-stage>button:hover{transform:none;transition:none}
+}

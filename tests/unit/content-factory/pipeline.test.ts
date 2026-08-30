@@ -193,3 +193,34 @@ describe("stage explanations", () => {
     expect(stage.lastTitle).toBe("Con fecha");
   });
 });
+
+describe("the rail says what is happening, not only that something is", () => {
+  const view = readFileSync(new URL("../../../src/components/agent-pipeline.tsx", import.meta.url), "utf8");
+  const button = readFileSync(new URL("../../../src/components/campaign-run-button.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../../src/app/globals.css", import.meta.url), "utf8");
+
+  it("puts the actual task on the working card", () => {
+    // "Trabajando ahora" says something is happening and never what, so the answer lived only in
+    // the panel below and the rail was decoration.
+    expect(view).toContain("pipeline-task");
+    expect(view).toContain("stage.currentTitle");
+  });
+
+  it("stops the button naming a stage it cannot know", () => {
+    // It counted its own calls rather than finished work, so a retry advanced the label and it
+    // announced the last stage while the first agent was still on the draft.
+    expect(button).not.toContain("Consolidando el brief");
+    expect(button).toContain('retrying ? "Reintentando…" : "Trabajando…"');
+  });
+
+  it("animates only what is actually happening", () => {
+    // Motion on an idle card would make idle look busy, which is the confusion the queued and
+    // working split exists to remove.
+    expect(css).toContain(".pipeline-stage.is-working>button::after");
+    expect(css).toContain(".pipeline-stage.is-queued>button{border-style:dashed");
+  });
+
+  it("honours a system preference against motion", () => {
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+});

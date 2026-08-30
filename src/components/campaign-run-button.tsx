@@ -18,8 +18,6 @@ import { useRouter } from "next/navigation";
 // one unchanging label reads as a hang, and the first thing anyone does with a hang is press the
 // button again.
 
-const STAGES = ["Estructurando la estrategia", "Investigando el mercado", "Priorizando canales", "Definiendo pilares y ángulos", "Consolidando el brief"];
-
 /**
  * Bounded, because a loop that never gives up is a loop that spends money all night. The runtime
  * stops re-asking a stage at its own attempt limit well before this, so reaching it means
@@ -31,13 +29,11 @@ const MAX_WAIT_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function CampaignRunButton({ id, demo, resume = false, startStage = 0, auto = false }: {
+export function CampaignRunButton({ id, demo, resume = false, auto = false }: {
   id: string;
   demo: boolean;
   /** The chain already started and stopped partway, so this continues it rather than opening a new one. */
   resume?: boolean;
-  /** How many stages are already stored, so a resume names the stage it is really on. */
-  startStage?: number;
   /**
    * The chain is already under way, so pick it up without waiting to be pressed.
    *
@@ -49,7 +45,6 @@ export function CampaignRunButton({ id, demo, resume = false, startStage = 0, au
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
-  const [stage, setStage] = useState(startStage);
   const [retrying, setRetrying] = useState(false);
 
   const started = useRef(false);
@@ -64,7 +59,6 @@ export function CampaignRunButton({ id, demo, resume = false, startStage = 0, au
   async function run() {
     if (demo) { router.refresh(); return; }
     setState("running");
-    setStage(startStage);
     setRetrying(false);
 
     for (let call = 0; call < MAX_CALLS; call += 1) {
@@ -86,14 +80,17 @@ export function CampaignRunButton({ id, demo, resume = false, startStage = 0, au
       }
 
       setRetrying(false);
-      setStage((current) => Math.min(current + 1, STAGES.length - 1));
     }
 
     setState("error");
   }
 
+  // The button no longer names a stage. It was counting its own calls rather than finished work,
+  // so a retry advanced the label and it announced "Consolidando el brief" while the first agent
+  // was still on the draft. The rail below reads the task rows and knows; a button that guesses
+  // next to a panel that knows is worse than a button that says only that it is working.
   const label = state === "running"
-    ? `${STAGES[stage]}${retrying ? " (reintentando)" : ""}…`
+    ? retrying ? "Reintentando…" : "Trabajando…"
     : resume ? "Continuar estrategia" : "Run Campaign Brain";
 
   return (

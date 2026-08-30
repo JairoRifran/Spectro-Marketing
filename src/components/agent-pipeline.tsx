@@ -93,6 +93,12 @@ function Stage({ stage, selected, onSelect }: { stage: PipelineStage; selected: 
         <strong className="pipeline-who">{stage.agentName}</strong>
         <span className="pipeline-does">{stage.label}</span>
         <span className="pipeline-state">{stateLine(stage, visual)}</span>
+        {/* What they are on, on the card itself. "Trabajando ahora" says that something is
+            happening and never what, so the answer lived only in the panel below and the rail
+            was decoration. The title is the task's own, never a generic label. */}
+        {(visual === "working" || visual === "queued") && stage.currentTitle && (
+          <span className="pipeline-task" title={stage.currentTitle}>{stage.currentTitle}</span>
+        )}
         {stage.failed > 0 && <span className="pipeline-broke">{plural(stage.failed, "falló", "fallaron")}</span>}
       </button>
     </li>
