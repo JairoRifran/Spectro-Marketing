@@ -5,7 +5,7 @@ import { getSettingsData } from "@/features/settings/data";
 import { PublishingMode } from "@/components/publishing-mode";
 import { INTEGRATIONS } from "@/server/integrations/catalog";
 import { callbackUrl, commonPortalFields } from "@/server/integrations/urls";
-import { isConfigured as linkedinConfigured } from "@/server/integrations/linkedin";
+import { IntegrationCredentials } from "@/components/integration-credentials";
 import { CopyField } from "@/components/copy-field";
 
 const tabs=[['/settings/company','Empresa'],['/settings/brand','Marca'],['/settings/team','Equipo'],['/settings/integrations','Integración'],['/settings/automation','Automatización']] as const;
@@ -29,11 +29,23 @@ export async function SettingsView({section}:{section:"company"|"brand"|"team"|"
             {/* The button appears only once the server has credentials for this channel. Offering
                 it earlier sends someone to a consent screen that cannot complete, and teaches
                 them the button is broken rather than that a step is missing. */}
-            {spec.platform==="linkedin"&&(linkedinConfigured()
+            {/* The button appears only once an app exists for this organization — its own or the
+                platform's. Offering it earlier sends someone to a consent screen that cannot
+                complete and teaches them the button is broken rather than that a step is missing. */}
+            {spec.platform==="linkedin"&&(data.credentials[spec.platform]?.configured
               ? <a className="primary-button integration-connect" href="/api/integrations/linkedin/start">
                   {status==="connected"?"Reconectar":"Conectar LinkedIn"}
                 </a>
-              : <p className="integration-pending">Cuando cargues <code>LINKEDIN_CLIENT_ID</code> y <code>LINKEDIN_CLIENT_SECRET</code> en el servidor, acá aparece el botón para conectar.</p>)}
+              : null)}
+            <IntegrationCredentials
+              platform={spec.platform}
+              label={spec.label}
+              configured={Boolean(data.credentials[spec.platform]?.configured)}
+              source={data.credentials[spec.platform]?.source??null}
+              canEdit={data.role==="owner"||data.role==="admin"}
+              demo={data.mode==="demo"}
+              envVars={spec.credentials}
+            />
             {row?.lastError&&<p className="integration-error">{row.lastError}</p>}
             <ol className="integration-steps">
               {spec.steps.map(step=><li key={step.title}>

@@ -1,5 +1,6 @@
 import { getOrganizationContext } from "@/features/organizations/context";
-import { authorizeUrl, isConfigured, signState } from "@/server/integrations/linkedin";
+import { authorizeUrl, signState } from "@/server/integrations/linkedin";
+import { appCredentials } from "@/server/integrations/credentials";
 
 // Starting the connection.
 //
@@ -15,13 +16,14 @@ export async function GET() {
   if (context.role !== "owner" && context.role !== "admin") {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
-  if (!isConfigured()) {
+  const credentials = await appCredentials(context.orgId, "linkedin");
+  if (!credentials) {
     return Response.json(
-      { error: "not_configured", message: "Faltan LINKEDIN_CLIENT_ID y LINKEDIN_CLIENT_SECRET en el servidor." },
+      { error: "not_configured", message: "No hay una app de LinkedIn configurada para esta organización ni para la plataforma." },
       { status: 409 },
     );
   }
 
   const state = signState({ organizationId: context.orgId, userId: context.user.id, issuedAt: Date.now() });
-  return Response.redirect(authorizeUrl(state), 302);
+  return Response.redirect(authorizeUrl(state, credentials), 302);
 }

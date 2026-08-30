@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeCode, verifyState } from "@/server/integrations/linkedin";
+import { appCredentials } from "@/server/integrations/credentials";
 import { appOrigin } from "@/server/integrations/urls";
 
 // Where LinkedIn sends the browser back.
@@ -33,9 +34,14 @@ export async function GET(request: Request) {
   const payload = verifyState(state);
   if (!payload) return back("estado_invalido");
 
+  // Resolved from the organization the signed state names, so the exchange uses the same app the
+  // authorization was started with.
+  const credentials = await appCredentials(payload.organizationId, "linkedin");
+  if (!credentials) return back("sin_credenciales");
+
   let grant;
   try {
-    grant = await exchangeCode(code);
+    grant = await exchangeCode(code, credentials);
   } catch {
     // The thrown message is deliberately thin, and even that does not travel in a URL.
     return back("intercambio_fallido");

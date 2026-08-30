@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { callbackUrl } from "./urls";
+import type { AppCredentials } from "./credentials";
 
 // LinkedIn's half of the connection.
 //
@@ -23,10 +24,6 @@ export const TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken";
  * confirm they connected the right one.
  */
 export const SCOPES = ["openid", "profile", "email", "w_organization_social", "r_organization_social"];
-
-export function isConfigured(env: NodeJS.ProcessEnv = process.env) {
-  return Boolean(env.LINKEDIN_CLIENT_ID?.trim() && env.LINKEDIN_CLIENT_SECRET?.trim());
-}
 
 /**
  * The `state` parameter, signed rather than stored.
@@ -69,10 +66,12 @@ export function verifyState(state: string, env: NodeJS.ProcessEnv = process.env)
   }
 }
 
-export function authorizeUrl(state: string, env: NodeJS.ProcessEnv = process.env) {
+// The credentials are passed in rather than read here, because which app a connection goes
+// through is an organization-level answer: its own if it registered one, the platform's otherwise.
+export function authorizeUrl(state: string, credentials: AppCredentials, env: NodeJS.ProcessEnv = process.env) {
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: env.LINKEDIN_CLIENT_ID!.trim(),
+    client_id: credentials.clientId,
     redirect_uri: callbackUrl("linkedin", env),
     state,
     scope: SCOPES.join(" "),
@@ -88,7 +87,7 @@ export interface TokenGrant {
 }
 
 /** Exchanges the one-time code for a token. Never logs the response. */
-export async function exchangeCode(code: string, env: NodeJS.ProcessEnv = process.env): Promise<TokenGrant> {
+export async function exchangeCode(code: string, credentials: AppCredentials, env: NodeJS.ProcessEnv = process.env): Promise<TokenGrant> {
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -96,8 +95,8 @@ export async function exchangeCode(code: string, env: NodeJS.ProcessEnv = proces
       grant_type: "authorization_code",
       code,
       redirect_uri: callbackUrl("linkedin", env),
-      client_id: env.LINKEDIN_CLIENT_ID!.trim(),
-      client_secret: env.LINKEDIN_CLIENT_SECRET!.trim(),
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
     }),
   });
 
