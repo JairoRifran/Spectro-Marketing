@@ -68,6 +68,16 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
     event.preventDefault();
     setBusy(true);
     setError("");
+    // Checked here rather than by disabling the button. A disabled control does nothing and
+    // explains nothing: the reader presses it, sees no reaction, and has no way to learn that a
+    // field above is empty. Saying what is missing is the whole difference.
+    if (!objectiveId) {
+      setError("Elegí un objetivo, o creá uno nuevo, antes de continuar.");
+      setBusy(false);
+      document.getElementById("objective-select")?.focus();
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
     const payload = {
       objectiveId,
@@ -96,7 +106,6 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
     setBusy(false);
   }
 
-  const objectiveReady = Boolean(objectiveId);
   const draftReady = draft.title.trim().length > 3 && draft.metric.trim().length > 1 && Number(draft.target) > 0;
 
   return (
@@ -111,7 +120,7 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
             <>
               <label>
                 Objetivo
-                <select name="objectiveId" required value={objectiveId} onChange={(event) => setObjectiveId(event.target.value)}>
+                <select id="objective-select" name="objectiveId" value={objectiveId} onChange={(event) => setObjectiveId(event.target.value)}>
                   <option value="" disabled>Seleccionar objetivo</option>
                   {available.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.target} {item.metric}</option>)}
                 </select>
@@ -192,7 +201,7 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
 
       <footer>
         <button type="button" className="secondary-button" onClick={() => router.back()}>Cancelar</button>
-        <button className="primary-button" disabled={busy || !objectiveReady}>{busy ? "Construyendo estrategia…" : "Crear campaña"}</button>
+        <button className="primary-button" disabled={busy}>{busy ? "Creando campaña…" : "Crear campaña"}</button>
       </footer>
     </form>
   );

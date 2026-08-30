@@ -126,3 +126,19 @@ describe("creating a campaign answers before the strategy runs", () => {
     expect(form).toMatch(/Revisá en Campañas si quedó creada/);
   });
 });
+
+describe("a control that will not act has to say why", () => {
+  const current = read("../../../src/components/campaign-create-form.tsx");
+
+  it("does not disable the submit for a missing objective", () => {
+    // A disabled button does nothing and explains nothing: the reader presses it, sees no
+    // reaction, and has no way to learn that a field above is empty. It reads as a broken app.
+    expect(current).toContain("disabled={busy}");
+    expect(current).not.toContain("!objectiveReady");
+  });
+
+  it("names what is missing and puts the cursor there", () => {
+    expect(current).toMatch(/Elegí un objetivo, o creá uno nuevo/);
+    expect(current).toContain('document.getElementById("objective-select")?.focus()');
+  });
+});
