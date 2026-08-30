@@ -34,7 +34,19 @@ const KNOWLEDGE_CONTENT_LIMIT = 2_500;
 /** Delegated to the shared helper so both manual paths answer this the same way. */
 const pending=(db:ReturnType<typeof createAdminClient>,campaignId:string)=>pendingCampaignWork(db,campaignId);
 
-export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string){
+/**
+ * Start the chain without waiting for it.
+ *
+ * Creating a campaign used to run the first strategic stage inside the same HTTP request. That
+ * was free when the deterministic provider answered in milliseconds and is a forty-second model
+ * call now -- inside a route that declared no duration at all, so the platform killed it, the
+ * browser saw a rejected fetch, and pressing "Crear campaña" did nothing and said nothing.
+ *
+ * The work itself is unchanged: the task is queued exactly as before. What changes is who drives
+ * it -- the campaign page picks up pending work on mount, which is the same loop that already
+ * carries the chain from one stage to the next.
+ */
+export async function runCampaignBrainForOrganization(organizationId:string,campaignId:string,userId:string,options:{execute?:boolean}={}){
   const db=createAdminClient();
   const {data:campaign,error}=await db.from("campaigns").select("id,name,status,strategy_version,objective_id,target_audience,constraints,preferred_platforms,objectives(title,description,metric,target)").eq("id",campaignId).eq("organization_id",organizationId).single();
   if(error||!campaign)throw new DomainError("authorization","Campaign unavailable.","campaign_not_found",false);
@@ -60,6 +72,13 @@ export async function runCampaignBrainForOrganization(organizationId:string,camp
   if(taskError||!task)throw new DomainError("non_retryable","Could not start Campaign Brain.","campaign_task_create_failed",false);
   await db.from("campaigns").update({status:"researching"}).eq("id",campaignId).eq("organization_id",organizationId);
   await db.from("activity_log").insert({organization_id:organizationId,campaign_id:campaignId,action:"campaign.research_started",actor_type:"user",actor_id:userId,entity_type:"campaign",entity_id:campaignId,task_id:task.id,summary:"Campaign Brain started manually",metadata:{strategy_version:version,automation_enabled:false}});
+  // Queued and handed back by default. Executing here is kept only for callers that want the
+  // whole thing inline, which is safe exclusively while a deterministic provider answers.
+  if(options.execute===false||(options.execute===undefined&&configuredAgentProviderName()!=="mock")){
+    const pendingNow=await pending(db,campaignId);
+    return{taskId:task.id,done:false,nextAttemptAt:pendingNow.nextAttemptAt,status:"researching",strategyVersion:version,report:{workerId:"",claimed:0,completed:0,retried:0,failed:0,exhausted:false}};
+  }
+
   const report=await runManualCampaignTasks({campaignId,maxSteps:stepsPerCall(),leaseSeconds:LEASE_SECONDS,budgetMs:BUDGET_MS});
   // A stage that failed is a real failure and stops the run. A stage not reached yet is not:
   // the caller continues from where this invocation left off.

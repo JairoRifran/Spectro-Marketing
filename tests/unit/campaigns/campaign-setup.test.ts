@@ -98,3 +98,31 @@ describe("a validation error has to say which box to fix", () => {
     expect(form).toContain("{draft.title.length}/160");
   });
 });
+
+describe("creating a campaign answers before the strategy runs", () => {
+  const workflow = read("../../../src/server/campaigns/workflow.ts");
+  const route = read("../../../src/app/api/campaigns/route.ts");
+
+  it("queues the first stage instead of awaiting a model inside the request", () => {
+    // It ran the stage inline, which was free at deterministic speed and is a forty-second call
+    // now. The platform killed the request, the fetch rejected, and the button did nothing.
+    expect(workflow).toContain('options.execute===false||(options.execute===undefined&&configuredAgentProviderName()!=="mock")');
+  });
+
+  it("declares a duration at all", () => {
+    expect(route).toContain("maxDuration = 60");
+  });
+
+  it("never lets the form fail without saying so", () => {
+    // An unhandled rejection is a button that does nothing and reports nothing, which is worse
+    // than an error: there is nothing to act on and no reason to believe anything happened.
+    const guarded = form.split("try {").length - 1;
+    expect(guarded).toBeGreaterThanOrEqual(2);
+    expect(form).toMatch(/Se cortó la conexión antes de terminar/);
+  });
+
+  it("tells the reader to check before retrying a write that may have landed", () => {
+    // A create that timed out may still have created. "Try again" would make two campaigns.
+    expect(form).toMatch(/Revisá en Campañas si quedó creada/);
+  });
+});

@@ -38,14 +38,21 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
     if (demo) return;
     setBusy(true);
     setError("");
-    const response = await fetch("/api/objectives", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: draft.title.trim(), metric: draft.metric.trim(), target: Number(draft.target) }),
-    });
-    const result = (await response.json().catch(() => null)) as (Objective & { message?: string }) | null;
-    if (!response.ok || !result?.id) {
-      setError(result?.message ?? "No pudimos crear el objetivo.");
+    let result: (Objective & { message?: string }) | null = null;
+    try {
+      const response = await fetch("/api/objectives", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: draft.title.trim(), metric: draft.metric.trim(), target: Number(draft.target) }),
+      });
+      result = (await response.json().catch(() => null)) as (Objective & { message?: string }) | null;
+      if (!response.ok || !result?.id) {
+        setError(result?.message ?? "No pudimos crear el objetivo.");
+        setBusy(false);
+        return;
+      }
+    } catch {
+      setError("Se cortó la conexión al guardar el objetivo.");
       setBusy(false);
       return;
     }
@@ -74,10 +81,18 @@ export function CampaignCreateForm({ objectives, demo }: { objectives: Objective
       platforms,
     };
     if (demo) { router.push("/campaigns/00000000-0000-0000-0000-000000000401"); return; }
-    const response = await fetch("/api/campaigns", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-    const result = await response.json().catch(() => null);
-    if (response.ok && result?.id) { router.push(`/campaigns/${result.id}`); router.refresh(); return; }
-    setError(result?.message ?? "No pudimos crear la campaña.");
+
+    // Guarded, because an unhandled rejection here is a button that does nothing and says
+    // nothing. That is exactly what happened when the request outlived the platform's limit: the
+    // fetch rejected, the form stayed busy, and the screen reported no fault at all.
+    try {
+      const response = await fetch("/api/campaigns", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await response.json().catch(() => null);
+      if (response.ok && result?.id) { router.push(`/campaigns/${result.id}`); router.refresh(); return; }
+      setError(result?.message ?? "No pudimos crear la campaña.");
+    } catch {
+      setError("Se cortó la conexión antes de terminar. Revisá en Campañas si quedó creada antes de volver a intentar.");
+    }
     setBusy(false);
   }
 
