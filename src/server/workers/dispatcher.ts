@@ -131,7 +131,10 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
     await persistDelegatedTasks(db, task, result.delegatedTasks ?? []);
     await Promise.all([
       db.from("task_runs").update({ status: "completed", output: result.output, completed_at: completedAt }).eq("id", taskRun.id),
-      db.from("agent_runs").update({ status: "completed", output: result.output, completed_at: completedAt, model: typeof result.output.model==="string"?result.output.model:null, prompt_version:typeof result.output.promptVersion==="string"?result.output.promptVersion:null, latency_ms:Date.now()-startedAt }).eq("id", agentRun.id),
+      // Tokens and cost land on the same row as the answer they paid for, which is the only
+      // place a question like "what did this campaign cost, and which stage spent it" can be
+      // answered from. A provider that bills nothing reports nothing and the defaults stand.
+      db.from("agent_runs").update({ status: "completed", output: result.output, completed_at: completedAt, model: typeof result.output.model==="string"?result.output.model:null, prompt_version:typeof result.output.promptVersion==="string"?result.output.promptVersion:null, latency_ms:Date.now()-startedAt, ...(result.usage ? { input_tokens: result.usage.inputTokens, output_tokens: result.usage.outputTokens, cache_read_tokens: result.usage.cacheReadTokens, cache_write_tokens: result.usage.cacheWriteTokens, cost_usd: result.usage.costUsd } : {}) }).eq("id", agentRun.id),
       db.from("agents").update({ last_run_at: completedAt }).eq("id", agent.id),
       db.from("activity_log").insert({ organization_id: task.organization_id, campaign_id:task.campaign_id, action: "task.completed", actor_type: "agent", actor_id: agent.id, entity_type: "task", entity_id: task.id, task_id: task.id, agent_id: agent.id, event_id: task.source_event_id, run_id: agentRun.id, summary: result.summary, metadata: { provider: providerName, correlation_id: correlationId } }),
     ]);

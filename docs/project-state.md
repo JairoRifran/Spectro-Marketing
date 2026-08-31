@@ -97,20 +97,34 @@ somebody's laptop. Running the chain locally against the production database is 
 dispatcher is a function of (database, provider), and the whole design already assumes it is
 awakened from outside — but then campaigns only advance while that machine is awake.
 
-**Where the money actually is, in order, none of it done yet:**
+**What was done about the cost, and what it bought.** Three changes, in the order they matter:
 
-1. **Nothing measures cost.** There is no token or spend record anywhere: not on `agent_runs`, not
-   on `task_runs`. Every number in this section about the paid provider would be an estimate, and
-   estimates are what got two stages tuned in the wrong direction already. Record
-   `input_tokens`, `output_tokens` and cache reads first, then decide.
-2. **No prompt caching.** The house rules, the role brief and the whole brand/product/persona/
-   knowledge block are resent at full price on every stage of every campaign — seven times over
-   for the same bytes. Caching that prefix is the single largest saving available and it costs
-   nothing in quality.
-3. **Every stage runs on the most expensive model.** Assembling a brief from four upstream steps
-   and distributing pillars by weight do not need the same model that argues the positioning.
-   Routing within Claude is the same mechanism `hybrid` already implements, just with a cheaper
-   Claude instead of a local model — and without the fabrication problem.
+1. **Every run now records what it cost.** `agent_runs` carries `input_tokens`, `output_tokens`,
+   `cache_read_tokens`, `cache_write_tokens` and `cost_usd`, and the campaign page shows the
+   total next to what the same calls would have cost with nothing cached. Tokens are the fact and
+   are stored as such; the dollars are derived at write time from a price table dated in
+   `src/server/agents/pricing.ts`, so a row stays recomputable if prices move. **Read this before
+   tuning anything else** — two stages were already tuned in the wrong direction on estimates.
+2. **The organisation block is cached.** The brand, products, personas and knowledge base are
+   identical across all five stages of a campaign and were re-sent at full price on every one of
+   them, plus once per retry. `cacheableContext()` splits the task input into a stable half and a
+   volatile half; the stable half carries the cache breakpoint, so the system prompt is cached
+   with it. Two rules keep it working and both are tested: keys are **sorted** before
+   serialising, and the split is an **allowlist** — an unlisted key costs a cache hit, while a
+   per-piece value inside the prefix would mean it never hits *and* pays the write premium every
+   call.
+3. **Only two stages still run on Opus.** The strategy draft and the copy — the positioning and
+   the text a customer reads. Research, channels, pillars, the final brief and the creative
+   review moved to Sonnet 5 ($2/$10 against $5/$25). Haiku 4.5 is cheaper still and was not
+   taken: it predates the 4.6 API and rejects both adaptive thinking and `output_config.effort`,
+   so it is a second request shape to maintain, not a swap.
+
+**If `cache_read_tokens` is ever zero across a whole campaign, something silently invalidated the
+prefix.** That is the one number worth watching; the page shows it.
+
+Two things follow from this that are not done. Caches are model-scoped, so splitting stages
+across two models splits the cache with them — worth re-measuring now that the numbers exist. And
+nothing yet aggregates cost across campaigns; the per-campaign figure is the only view.
 
 ## Traps that already cost a day
 

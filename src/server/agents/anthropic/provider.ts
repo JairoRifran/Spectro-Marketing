@@ -5,7 +5,8 @@ import { MockProvider } from "../mock-provider";
 import { nextCampaignTasks } from "@/server/campaigns/chain";
 import { DomainError } from "@/server/errors";
 import { BRIEFS, type Brief } from "../briefs";
-import { askable, contextFor, pinIdentity, summarise } from "../shaping";
+import { askable, cacheableContext, pinIdentity, summarise } from "../shaping";
+import { costUsd, type TokenUsage } from "../pricing";
 
 // The provider that actually asks a model.
 //
@@ -24,6 +25,36 @@ import { askable, contextFor, pinIdentity, summarise } from "../shaping";
 // nothing for a model to add and a real chance for it to drift.
 
 export const MODEL = "claude-opus-5";
+
+/**
+ * Which Claude answers which stage.
+ *
+ * Every stage ran on the most expensive model available, and most of them are not doing the kind
+ * of work that pays for. Assembling a brief out of four upstream steps, scoring channels against
+ * stated criteria, distributing pillars by weight -- these restructure material that is already
+ * in the prompt. Sonnet 5 does that, at two fifths the input price and two fifths the output.
+ *
+ * Two stages keep Opus. The strategy draft is where the positioning is actually argued and the
+ * copy is the text a customer reads: those are the product, and making them cheaper is not a
+ * saving. This is the same line the local-model policy draws, for the same reason, and it is
+ * overridable the same way.
+ *
+ * Sonnet 5 was chosen over the cheaper Haiku 4.5 deliberately: Haiku predates the 4.6 API and
+ * rejects both adaptive thinking and `output_config.effort`, so it is not a swap but a second
+ * request shape to maintain and test. Half the saving for none of the risk.
+ */
+export const STANDARD_MODEL = "claude-sonnet-5";
+const PREMIUM_TASKS = ["campaign.strategy.draft", "content.copy"];
+
+export function premiumTasks(env: Record<string, string | undefined> = process.env): string[] {
+  const override = env.AI_PREMIUM_TASKS?.trim();
+  if (override === undefined) return [...PREMIUM_TASKS];
+  return override.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+export function modelFor(taskType: string, env: Record<string, string | undefined> = process.env): string {
+  return premiumTasks(env).includes(taskType) ? MODEL : STANDARD_MODEL;
+}
 
 /**
  * How long one call may take.
@@ -119,26 +150,28 @@ export class AnthropicProvider implements AgentProvider {
     const brief = BRIEFS[context.task.type];
     if (!brief) return this.fallback.run(context);
 
-    const parsed = await this.ask(brief, context);
+    const model = modelFor(context.task.type);
+    const { parsed, usage } = await this.ask(brief, context, model);
     const output: Record<string, unknown> = {
       ...parsed,
       provider: this.name,
-      model: MODEL,
+      model,
       promptVersion: brief.promptVersion,
     };
 
     if (context.task.type === "content.copy") pinIdentity(output, context);
 
     return {
-      summary: summarise(context, brief, MODEL),
+      summary: summarise(context, brief, model),
       output,
+      usage: { ...usage, model, costUsd: costUsd(model, usage) },
       // The chain is the same table the deterministic provider reads, so a campaign advances
       // identically whoever answered — and carries this step's output to the next one.
       delegatedTasks: nextCampaignTasks(context.task.type, context.task.input, context.task.id, output),
     };
   }
 
-  private async ask(brief: Brief, context: AgentContext) {
+  private async ask(brief: Brief, context: AgentContext, model: string) {
     // The whole body is guarded, not just the call.
     //
     // Only the request used to be wrapped, and the validation is not in the request: the API
@@ -149,17 +182,30 @@ export class AnthropicProvider implements AgentProvider {
     // naming nothing. The stage was lost to a sentence that fits every failure.
     try {
       const schema = askable(brief.schemaFor?.(context.task) ?? brief.schema);
+      // The brand, the products, the personas and the knowledge base are identical across every
+      // stage of a campaign and were re-sent at full price on each of them, plus once per retry.
+      // Split off and marked here, that block plus the system prompt above it becomes a cached
+      // prefix: written once at a small premium, then read back at about a tenth of the price.
+      const { stable, volatile } = cacheableContext(context);
       // Streamed rather than awaited whole: a high-effort answer against a schema this size is
       // long enough to trip a request timeout, and a timeout here costs the stage.
       const message = await anthropic().messages.stream({
-        model: MODEL,
+        model,
         max_tokens: MAX_TOKENS[context.task.type] ?? DEFAULT_MAX_TOKENS,
         // Adaptive lets the model spend thought where the task is genuinely hard — a channel
         // strategy is not a campaign draft — instead of a fixed budget paid on every call.
         thinking: { type: "adaptive" },
         output_config: { effort: brief.effort, format: zodOutputFormat(schema) },
         system: brief.system,
-        messages: [{ role: "user", content: [contextFor(context), "", brief.instruction].join("\n") }],
+        messages: [{
+          role: "user",
+          content: [
+            // Caching is a prefix match, so the breakpoint goes at the end of the stable half and
+            // everything before it — the system prompt included — is cached along with it.
+            { type: "text", text: stable, cache_control: { type: "ephemeral" } },
+            { type: "text", text: [volatile, "", brief.instruction].join("\n") },
+          ],
+        }],
       }, {
         timeout: CALL_TIMEOUT_MS,
         // The timeout alone did not bound this. A stream that keeps emitting events is a request
@@ -183,7 +229,13 @@ export class AnthropicProvider implements AgentProvider {
       if (!parsed) {
         throw new DomainError("validation", "El modelo devolvió una respuesta que no cumple el esquema.", "anthropic_output_invalid", true);
       }
-      return parsed as Record<string, unknown>;
+      const usage: TokenUsage = {
+        inputTokens: message.usage.input_tokens ?? 0,
+        outputTokens: message.usage.output_tokens ?? 0,
+        cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
+      };
+      return { parsed: parsed as Record<string, unknown>, usage };
     } catch (error) {
       translate(error);
     }

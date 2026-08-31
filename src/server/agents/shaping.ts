@@ -40,6 +40,60 @@ export function contextFor(context: AgentContext): string {
 }
 
 /**
+ * The part of a task's context that does not change between the stages of one campaign.
+ *
+ * Every stage of a campaign is handed the same brand, the same products, the same personas and
+ * the same knowledge base, and until now all of it was re-sent at full price five times over —
+ * plus once more for every retry. Split off, that block becomes a cacheable prefix.
+ *
+ * The list is an allowlist and not an exclusion, which is the conservative direction. A key
+ * nobody thought about lands in the volatile half: it costs a cache hit, never a wrong answer.
+ * The reverse mistake — a per-piece value sitting inside the cached prefix — would mean the
+ * prefix differs on every call, so it never hits *and* pays the write premium each time.
+ */
+const STABLE_KEYS = new Set([
+  "allowedPlatforms", "audienceHint", "brandContext", "brandName", "brandTone", "campaignId",
+  "campaignName", "constraints", "forbiddenClaims", "forbiddenWords", "knowledgeItems",
+  "knowledgeTitles", "metric", "objectiveDescription", "objectiveTitle", "personaNames",
+  "personas", "productNames", "products", "strategyVersion", "target",
+]);
+
+/** Keys sorted, because caching is a byte-for-byte prefix match and object order is not a promise. */
+function stableJson(input: Record<string, unknown>): string {
+  return JSON.stringify(input, Object.keys(input).sort(), 1);
+}
+
+/**
+ * The task context, split into what can be cached and what cannot.
+ *
+ * Returns the stable half first so it can carry the cache breakpoint: the API caches everything
+ * before that point, which means the system prompt comes along for free.
+ */
+export function cacheableContext(context: AgentContext): { stable: string; volatile: string } {
+  const stable: Record<string, unknown> = {};
+  const volatile: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context.task.input)) {
+    // An internal identifier is noise in a brief: it says nothing about the campaign.
+    if (key === "sourceTaskId") continue;
+    (STABLE_KEYS.has(key) ? stable : volatile)[key] = value;
+  }
+
+  const rest = stableJson(volatile);
+  return {
+    stable: [`Contexto de la organización y la campaña:`, "", "```json", stableJson(stable), "```"].join("\n"),
+    volatile: [
+      `Tarea "${context.task.title}":`,
+      "",
+      "```json",
+      // A campaign carrying an unusually large brief is truncated rather than rejected: a
+      // slightly shorter context still produces a usable answer, while a 413 produces nothing.
+      rest.length > 120_000 ? `${rest.slice(0, 120_000)}\n… (contexto recortado)` : rest,
+      "```",
+    ].join("\n"),
+  };
+}
+
+/**
  * The piece's identity is a fact of the task, not a choice.
  *
  * Which platform and format this variant is for was decided by the plan. Letting the answer

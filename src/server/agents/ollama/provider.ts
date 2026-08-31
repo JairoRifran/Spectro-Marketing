@@ -4,6 +4,7 @@ import { nextCampaignTasks } from "@/server/campaigns/chain";
 import { DomainError } from "@/server/errors";
 import { BRIEFS, type Brief } from "../briefs";
 import { askable, contextFor, pinIdentity, summarise } from "../shaping";
+import { EMPTY_USAGE, type TokenUsage } from "../pricing";
 
 // A model that runs on your own machine, and costs nothing to ask.
 //
@@ -90,6 +91,8 @@ interface StreamEvent {
   done?: boolean;
   done_reason?: string;
   error?: string;
+  prompt_eval_count?: number;
+  eval_count?: number;
 }
 
 /**
@@ -101,7 +104,7 @@ interface StreamEvent {
  * died looking exactly like a refused connection, which is the wrong thing to tell somebody. A
  * streamed response sends its headers immediately, so the only clock left is the one we set.
  */
-async function collect(response: Response): Promise<{ content: string; doneReason: string }> {
+async function collect(response: Response): Promise<{ content: string; doneReason: string; usage: TokenUsage }> {
   const reader = response.body?.getReader();
   if (!reader) throw new DomainError("provider", "Ollama devolvió una respuesta sin cuerpo.", "ollama_empty", true);
 
@@ -109,6 +112,9 @@ async function collect(response: Response): Promise<{ content: string; doneReaso
   let buffer = "";
   let content = "";
   let doneReason = "";
+  // Counted even though it is free: "free" is a claim worth being able to check, and the token
+  // numbers are what make a local run comparable to a paid one at all.
+  let usage: TokenUsage = { ...EMPTY_USAGE };
 
   const consume = (line: string) => {
     const trimmed = line.trim();
@@ -122,7 +128,10 @@ async function collect(response: Response): Promise<{ content: string; doneReaso
     }
     if (event.error) throw new DomainError("provider", `Ollama falló: ${event.error}`.slice(0, 300), "ollama_failed", true);
     content += event.message?.content ?? "";
-    if (event.done) doneReason = event.done_reason ?? "stop";
+    if (event.done) {
+      doneReason = event.done_reason ?? "stop";
+      usage = { ...EMPTY_USAGE, inputTokens: event.prompt_eval_count ?? 0, outputTokens: event.eval_count ?? 0 };
+    }
   };
 
   for (;;) {
@@ -138,7 +147,7 @@ async function collect(response: Response): Promise<{ content: string; doneReaso
   }
   consume(buffer);
 
-  return { content: content.trim(), doneReason };
+  return { content: content.trim(), doneReason, usage };
 }
 
 export class OllamaProvider implements AgentProvider {
@@ -151,7 +160,7 @@ export class OllamaProvider implements AgentProvider {
     if (!brief) return this.fallback.run(context);
 
     const settings = ollamaSettings();
-    const parsed = await this.ask(brief, context, settings);
+    const { parsed, usage } = await this.ask(brief, context, settings);
     const output: Record<string, unknown> = {
       ...parsed,
       provider: this.name,
@@ -164,6 +173,9 @@ export class OllamaProvider implements AgentProvider {
     return {
       summary: summarise(context, brief, settings.model),
       output,
+      // Zero, and recorded anyway: a run that cost nothing is still a run whose size is worth
+      // knowing next to the ones that did.
+      usage: { ...usage, model: settings.model, costUsd: 0 },
       delegatedTasks: nextCampaignTasks(context.task.type, context.task.input, context.task.id, output),
     };
   }
@@ -211,8 +223,9 @@ export class OllamaProvider implements AgentProvider {
     // Guarded too: a deadline can just as easily fire halfway through the read.
     let content: string;
     let doneReason: string;
+    let usage: TokenUsage;
     try {
-      ({ content, doneReason } = await collect(response));
+      ({ content, doneReason, usage } = await collect(response));
     } catch (error) {
       classify(error, settings.url);
     }
@@ -241,6 +254,6 @@ export class OllamaProvider implements AgentProvider {
       const where = first?.path.join(".") || "la raíz";
       throw new DomainError("validation", `La respuesta del modelo local no cumple el esquema en ${where}: ${first?.message ?? "sin detalle"}`.slice(0, 900), "ollama_output_rejected", true);
     }
-    return result.data as Record<string, unknown>;
+    return { parsed: result.data as Record<string, unknown>, usage };
   }
 }
