@@ -1,11 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import type { ZodObject, ZodRawShape } from "zod";
 import type { AgentContext, AgentProvider, AgentResult } from "../contracts";
 import { MockProvider } from "../mock-provider";
 import { nextCampaignTasks } from "@/server/campaigns/chain";
 import { DomainError } from "@/server/errors";
-import { BRIEFS, type Brief } from "./briefs";
+import { BRIEFS, type Brief } from "../briefs";
+import { askable, contextFor, pinIdentity, summarise } from "../shaping";
 
 // The provider that actually asks a model.
 //
@@ -65,17 +65,6 @@ const MAX_TOKENS: Record<string, number> = {
 };
 const DEFAULT_MAX_TOKENS = 8_000;
 
-/** Provenance is stamped, never asked for — a model can only guess at its own. */
-export const STAMPED = ["provider", "model", "promptVersion"] as const;
-
-/** The schema the model is held to: the persisted one minus the fields it must not author. */
-export function askable(schema: Brief["schema"]) {
-  // Every brief schema is a plain object; the cast keeps `omit` reachable without widening the
-  // public `Brief` type into something a caller could pass a union to.
-  const object = schema as unknown as ZodObject<ZodRawShape>;
-  return object.omit(Object.fromEntries(STAMPED.map((key) => [key, true as const])));
-}
-
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
@@ -90,24 +79,6 @@ function anthropic(): Anthropic {
   // Reused across invocations so a warm function keeps its connection pool.
   if (!client) client = new Anthropic({ apiKey: key, maxRetries: 2 });
   return client;
-}
-
-/**
- * What the agent is told about this task.
- *
- * The input is sent as JSON because it already is structured — full brand, product, persona and
- * knowledge context, plus the upstream steps' own output. Flattening it into prose would lose the
- * nesting that says which pain belongs to which audience.
- */
-function contextFor(context: AgentContext): string {
-  const input = { ...context.task.input };
-  // An internal identifier is noise in a brief: it says nothing about the campaign.
-  delete input.sourceTaskId;
-  const body = JSON.stringify(input, null, 1);
-  // A campaign carrying an unusually large brief is truncated rather than rejected: a slightly
-  // shorter context still produces a usable answer, while a 413 produces nothing.
-  const trimmed = body.length > 120_000 ? `${body.slice(0, 120_000)}\n… (contexto recortado)` : body;
-  return [`Contexto de la tarea "${context.task.title}":`, "", "```json", trimmed, "```"].join("\n");
 }
 
 /** Vendor failures split into retry and do-not-retry, because they are different next steps. */
@@ -159,7 +130,7 @@ export class AnthropicProvider implements AgentProvider {
     if (context.task.type === "content.copy") pinIdentity(output, context);
 
     return {
-      summary: summarise(context, brief),
+      summary: summarise(context, brief, MODEL),
       output,
       // The chain is the same table the deterministic provider reads, so a campaign advances
       // identically whoever answered — and carries this step's output to the next one.
@@ -217,31 +188,4 @@ export class AnthropicProvider implements AgentProvider {
       translate(error);
     }
   }
-}
-
-/**
- * The piece's identity is a fact of the task, not a choice.
- *
- * Which platform and format this variant is for was decided by the plan. Letting the answer
- * carry its own is how a request for a story came back as a carousel, twice — once on LinkedIn
- * and once on Instagram — and each time the mismatch only surfaced downstream, in a renderer
- * that had been handed a shape it could not draw.
- */
-export function pinIdentity(output: Record<string, unknown>, context: AgentContext) {
-  const variant = output.variant as Record<string, unknown> | undefined;
-  if (!variant) return;
-  const input = context.task.input as { conceptId?: string; concept?: { conceptId?: string; format?: string; platforms?: string[] }; brief?: { platform?: string; format?: string } };
-  const platform = input.brief?.platform;
-  const format = input.brief?.format ?? input.concept?.format;
-  const conceptId = input.conceptId ?? input.concept?.conceptId;
-  if (platform) variant.platform = platform;
-  if (format) variant.format = format;
-  if (conceptId) variant.conceptId = conceptId;
-  variant.generatedBy = "provider";
-}
-
-/** One line for the activity trail. A summary, never the reasoning that produced it. */
-function summarise(context: AgentContext, brief: Brief): string {
-  const who = context.agent.displayName || brief.role;
-  return `${who} completó ${context.task.title} con ${MODEL}.`;
 }

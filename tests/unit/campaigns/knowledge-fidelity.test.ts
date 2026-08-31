@@ -5,7 +5,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf
 
 describe("Campaign Brain knowledge fidelity", () => {
   const workflow = read("../../../src/server/campaigns/workflow.ts");
-  const briefs = read("../../../src/server/agents/anthropic/briefs.ts");
+  const briefs = read("../../../src/server/agents/briefs.ts");
   const seed = read("../../../supabase/seed/spectro-knowledge.sql");
   const migration = read("../../../supabase/migrations/202608300008_refresh_spectro_product_knowledge.sql");
 

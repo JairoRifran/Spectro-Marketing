@@ -108,7 +108,7 @@ describe("a half-finished chain can be reached from the screen", () => {
 
 describe("a stage waiting out its backoff is not a failure", () => {
   const button = read("../../../src/components/campaign-run-button.tsx");
-  const briefs = read("../../../src/server/agents/anthropic/briefs.ts");
+  const briefs = read("../../../src/server/agents/briefs.ts");
   const dispatcher3 = read("../../../src/server/workers/dispatcher.ts");
   const workflow = read("../../../src/server/campaigns/workflow.ts");
 

@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { AnthropicProvider, MODEL, STAMPED, askable, pinIdentity } from "@/server/agents/anthropic/provider";
-import { BRIEFS } from "@/server/agents/anthropic/briefs";
+import { AnthropicProvider, MODEL } from "@/server/agents/anthropic/provider";
+import { STAMPED, askable, pinIdentity } from "@/server/agents/shaping";
+import { BRIEFS } from "@/server/agents/briefs";
 import { MockProvider } from "@/server/agents/mock-provider";
 import { getAgentProvider } from "@/server/agents/provider";
 import { nextCampaignTasks } from "@/server/campaigns/chain";
@@ -209,13 +210,13 @@ describe("nothing escapes untranslated", () => {
   });
 
   it("tells the model the limits are enforced after the fact", () => {
-    const briefs = readFileSync(new URL("../../../src/server/agents/anthropic/briefs.ts", import.meta.url), "utf8");
+    const briefs = readFileSync(new URL("../../../src/server/agents/briefs.ts", import.meta.url), "utf8");
     expect(briefs).toMatch(/Respeta los limites que el esquema declara/);
   });
 });
 
 describe("the writer is asked for one shape, not five", () => {
-  const source = readFileSync(new URL("../../../src/server/agents/anthropic/content-schema.ts", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../../../src/server/agents/content-schema.ts", import.meta.url), "utf8");
 
   it("takes the shape from the adapter that will render it", () => {
     // Not a mapping restated here: platform and format resolve to a shape through the same

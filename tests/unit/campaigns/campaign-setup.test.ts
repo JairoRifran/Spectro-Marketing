@@ -10,7 +10,7 @@ const form = read("../../../src/components/campaign-create-form.tsx");
 const route = read("../../../src/app/api/campaigns/route.ts");
 const objectives = read("../../../src/app/api/objectives/route.ts");
 const workflow = read("../../../src/server/campaigns/workflow.ts");
-const briefs = read("../../../src/server/agents/anthropic/briefs.ts");
+const briefs = read("../../../src/server/agents/briefs.ts");
 const migration = read("../../../supabase/migrations/202608300007_campaign_platforms.sql");
 
 const base = { objectiveId: "0b7d6a1e-2c3f-4d5e-8a9b-0c1d2e3f4a5b" };

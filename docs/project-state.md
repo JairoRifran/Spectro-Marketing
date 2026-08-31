@@ -51,12 +51,66 @@ change that ignores it will look correct and fail in production only.
 - **The screen drives the loop.** The endpoint advances what it can and returns `done` and
   `nextAttemptAt`; the button asks again, waiting out retries. It also resumes on mount, because
   the loop lives in the page and a reload used to abandon a run.
-- **Effort is turned down, and that is a trade, not a tuning.** Only `campaign.strategy.draft`
-  and `content.copy` run above `low`. Everything else timed out at `medium` or `high`. Pillars
-  and angles are genuine judgement and currently get less thought than they deserve. **On a plan
-  with longer functions, raising these back is a three-line change and the first thing to do.**
+- **Effort is turned down, and that is a trade, not a tuning.** Every strategic stage now runs at
+  `low`; only `content.copy` and `content.creative_review` are above it, at `medium`. Each one was
+  lowered after it timed out, the draft last of all — six attempts out of six on a campaign whose
+  input had grown by a paragraph. There is no headroom left on this plan. Pillars, angles and
+  positioning are genuine judgement and currently get the least thought the platform allows.
+  **On a plan with longer functions, raising these back is a three-line change and the first
+  thing to do.**
+- **A timeout is our own deadline, so it gets three attempts and not six.** Re-asking an unchanged
+  request that already ran long buys the same answer again and charges for it. Every other kind of
+  failure keeps its full budget: a rate limit or an unreachable vendor is worth waiting out.
 - Per-stage `max_tokens` matter more than effort for wall-clock: adaptive thinking spends from
   the same budget, so a flat 16k let a stage with a dozen short lists think to the deadline.
+
+## Spending less
+
+The question that produced this section was "can we use a local model instead". It is the right
+question with a measured answer, and the answer is mostly no — but not entirely.
+
+**What was measured**, on the development machine (Intel Iris Xe, no discrete GPU, 16 GB):
+
+| | Result |
+| --- | --- |
+| Free generation, `qwen2.5:3b` | ~11–13 tokens/s |
+| Prompt reading | under 40 tokens/s |
+| A real research stage, full schema | **did not finish in ten minutes** |
+| A small schema, short prompt | 503 tokens in 44 s — fine |
+| Factual quality | invented a market size and two institutions, one of which does not exist in Uruguay |
+
+That last row is the one that decides it. Asked about a market it knows nothing about, and under
+this project's own "do not invent figures" rule, the small model did not decline — it fabricated,
+with named sources. Fabricated numbers wearing a source are the exact failure this product exists
+to prevent, and `campaign.research` is where the temptation peaks. So research is escalated to the
+paid model in `hybrid`, alongside the draft and the copy.
+
+**`AI_PROVIDER=ollama` and `hybrid` exist and work.** The provider is real, tested, and streams
+(it must: unstreamed, Node stops waiting for headers at five minutes and the failure looks exactly
+like a refused connection). What it is genuinely good for today is development and end-to-end
+tests — a stage that takes minutes is fine when nobody is waiting, and it costs nothing. On a
+machine with a real GPU and a 30B-class model, `hybrid` becomes a serious option; the split is
+already written down in `src/server/agents/provider.ts` and overridable with `AI_JUDGEMENT_TASKS`.
+
+**A local model cannot serve production here anyway.** Vercel functions cannot reach a model on
+somebody's laptop. Running the chain locally against the production database is possible — the
+dispatcher is a function of (database, provider), and the whole design already assumes it is
+awakened from outside — but then campaigns only advance while that machine is awake.
+
+**Where the money actually is, in order, none of it done yet:**
+
+1. **Nothing measures cost.** There is no token or spend record anywhere: not on `agent_runs`, not
+   on `task_runs`. Every number in this section about the paid provider would be an estimate, and
+   estimates are what got two stages tuned in the wrong direction already. Record
+   `input_tokens`, `output_tokens` and cache reads first, then decide.
+2. **No prompt caching.** The house rules, the role brief and the whole brand/product/persona/
+   knowledge block are resent at full price on every stage of every campaign — seven times over
+   for the same bytes. Caching that prefix is the single largest saving available and it costs
+   nothing in quality.
+3. **Every stage runs on the most expensive model.** Assembling a brief from four upstream steps
+   and distributing pillars by weight do not need the same model that argues the positioning.
+   Routing within Claude is the same mechanism `hybrid` already implements, just with a cheaper
+   Claude instead of a local model — and without the fabrication problem.
 
 ## Traps that already cost a day
 

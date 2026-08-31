@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { log } from "@/lib/logging/logger";
 import { DomainError, publicError } from "@/server/errors";
 import { eventToTask, type PersistentEvent } from "@/server/events/handler";
-import { configuredAgentProviderName, getAgentProvider } from "@/server/agents/provider";
+import { providerForTask, providerNameForTask } from "@/server/agents/provider";
 import type { RuntimeTask } from "@/server/tasks/types";
 import { retryDecision } from "@/server/tasks/retry";
 import { executionAllowed } from "@/server/policies/execution";
@@ -89,7 +89,7 @@ async function failEvent(db: SupabaseClient, event: PersistentEvent, code: strin
 
 async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: string): Promise<"completed"|"retried"|"failed"> {
   const correlationId = crypto.randomUUID();
-  const providerName = configuredAgentProviderName();
+  const providerName = providerNameForTask(task.type);
   const { data: agentData, error: agentError } = task.assigned_agent_id
     ? await db.from("agents").select("id,organization_id,role,display_name,autonomy_level,configuration").eq("id", task.assigned_agent_id).single()
     : { data: null, error: null };
@@ -122,7 +122,7 @@ async function executeTask(db: SupabaseClient, task: RuntimeTask, workerId: stri
   log("info", "task.started", { organizationId: task.organization_id, taskId: task.id, agentId: agent.id, runId: agentRun.id, eventId: task.source_event_id ?? undefined, correlationId });
   try {
     const startedAt=Date.now();
-    const result = await getAgentProvider().run({ organizationId: task.organization_id, agent: { id: agent.id, role: agent.role, displayName: agent.display_name, autonomyLevel: agent.autonomy_level, configuration: agent.configuration }, task, correlationId });
+    const result = await providerForTask(task.type).run({ organizationId: task.organization_id, agent: { id: agent.id, role: agent.role, displayName: agent.display_name, autonomyLevel: agent.autonomy_level, configuration: agent.configuration }, task, correlationId });
     await persistCampaignOutcome(db,task,result,agent);
     await persistContentOutcome(db,task,result,agent);
     const completedAt = new Date().toISOString();

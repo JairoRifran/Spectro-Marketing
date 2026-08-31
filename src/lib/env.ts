@@ -8,7 +8,7 @@ const publicSchema = z.object({
 const serverSchema = publicSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   CRON_SECRET: z.string().min(24),
-  AI_PROVIDER: z.preprocess((value) => value === "" ? undefined : value,z.enum(["mock", "openai", "anthropic"]).default("mock")),
+  AI_PROVIDER: z.preprocess((value) => value === "" ? undefined : value,z.enum(["mock", "openai", "anthropic", "ollama", "hybrid"]).default("mock")),
   DISPATCH_BATCH_SIZE: z.preprocess((value) => value === "" ? undefined : value,z.coerce.number().int().min(1).max(20).default(5)),
   TASK_LEASE_SECONDS: z.preprocess((value) => value === "" ? undefined : value,z.coerce.number().int().min(15).max(900).default(120)),
 });
