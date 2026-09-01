@@ -95,7 +95,8 @@ describe("a half-finished chain can be reached from the screen", () => {
     // advanced and a half-finished chain went back to offering "Run Campaign Brain".
     expect(page).toContain("pipeline?.totals.active??0)>0");
     expect(page).not.toContain('c.status==="researching"');
-    expect(page).toContain("runnable||resumable");
+    expect(page).toContain("retryable");
+    expect(page).toContain("resumable?<CampaignRunButton");
   });
 
   it("says it is continuing, not starting over", () => {

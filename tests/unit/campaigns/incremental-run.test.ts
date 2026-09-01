@@ -168,7 +168,8 @@ describe("a run that was started keeps going without being pressed again", () =>
   it("only ever continues work, never starts it", () => {
     // Resuming spends money on a run a person already authorised. Starting one would not be
     // theirs to authorise.
-    expect(page).toContain("auto={resumable&&!runnable}");
+    expect(page).toContain("resumable?<CampaignRunButton");
+    expect(page).toContain("resume auto");
     expect(page).toContain("contentPending");
   });
 

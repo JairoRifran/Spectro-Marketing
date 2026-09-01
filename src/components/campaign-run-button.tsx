@@ -29,11 +29,13 @@ const MAX_WAIT_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function CampaignRunButton({ id, demo, resume = false, auto = false }: {
+export function CampaignRunButton({ id, demo, resume = false, retry = false, auto = false }: {
   id: string;
   demo: boolean;
   /** The chain already started and stopped partway, so this continues it rather than opening a new one. */
   resume?: boolean;
+  /** A terminal stage is reopened only after this explicit user action. */
+  retry?: boolean;
   /**
    * The chain is already under way, so pick it up without waiting to be pressed.
    *
@@ -46,6 +48,7 @@ export function CampaignRunButton({ id, demo, resume = false, auto = false }: {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "error">("idle");
   const [retrying, setRetrying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const started = useRef(false);
   useEffect(() => {
@@ -60,10 +63,17 @@ export function CampaignRunButton({ id, demo, resume = false, auto = false }: {
     if (demo) { router.refresh(); return; }
     setState("running");
     setRetrying(false);
+    setErrorMessage("");
 
     for (let call = 0; call < MAX_CALLS; call += 1) {
       const response = await fetch(`/api/campaigns/${id}/run`, { method: "POST" });
-      if (!response.ok) { setState("error"); return; }
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as {error?:{message?:string}}|null;
+        setErrorMessage(body?.error?.message??"No se pudo completar. Revisá actividad y estado.");
+        setState("error");
+        router.refresh();
+        return;
+      }
       const result = (await response.json()) as { done?: boolean; nextAttemptAt?: string | null; report?: { claimed?: number } };
       // Refreshed on every pass, so the pipeline fills in as the work happens rather than
       // arriving all at once at the end.
@@ -91,13 +101,14 @@ export function CampaignRunButton({ id, demo, resume = false, auto = false }: {
   // next to a panel that knows is worse than a button that says only that it is working.
   const label = state === "running"
     ? retrying ? "Reintentando…" : "Trabajando…"
-    : resume ? "Continuar estrategia" : "Run Campaign Brain";
+    : retry ? "Reintentar etapa fallida" : resume ? "Continuar estrategia" : "Run Campaign Brain";
 
   return (
     <div className="run-action">
       <button className="primary-button" onClick={run} disabled={state === "running"}>{label}</button>
+      {retry && state === "idle" && <small>Reabre sólo la etapa que falló; conserva todo lo ya terminado.</small>}
       {resume && state === "idle" && <small>La estrategia quedó a medias. Continúa donde se cortó, sin rehacer lo terminado.</small>}
-      {state === "error" && <small>No se pudo completar. Revisá actividad y estado.</small>}
+      {state === "error" && <small>{errorMessage}</small>}
     </div>
   );
 }

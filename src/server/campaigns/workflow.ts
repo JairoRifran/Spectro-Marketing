@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { pendingCampaignWork, runManualCampaignTasks } from "@/server/workers/dispatcher";
 import { configuredAgentProviderName } from "@/server/agents/provider";
 import { DomainError } from "@/server/errors";
+import { log } from "@/lib/logging/logger";
+import { CAMPAIGN_STRATEGY_TASK_TYPES, retryAttemptCeiling } from "@/server/campaigns/task-types";
 
 // How much of Campaign Brain runs in one HTTP request.
 //
@@ -104,4 +106,57 @@ export async function resumeCampaignBrainForOrganization(organizationId:string,c
   const {data:finished}=await db.from("campaigns").select("status,strategy_version").eq("id",campaignId).single();
   const left=await pending(db,campaignId);
   return{taskId:null,done:left.count===0,nextAttemptAt:left.nextAttemptAt,status:finished?.status??campaign.status,strategyVersion:finished?.strategy_version??campaign.strategy_version,report};
+}
+
+/**
+ * Reopen exactly the failed strategy stage a person chose to retry.
+ *
+ * A non-retryable provider failure used to leave the campaign in `researching` with no queued
+ * work. Starting refused that status and resuming found nothing, so the only apparent escape was
+ * creating a duplicate campaign. Requeueing the same task preserves its idempotency key,
+ * dependencies, input, completed predecessors and complete run history.
+ */
+export async function requeueFailedCampaignStageForOrganization(organizationId:string,campaignId:string,userId:string){
+  const db=createAdminClient();
+  const {data:campaign,error:campaignError}=await db.from("campaigns").select("id,status").eq("id",campaignId).eq("organization_id",organizationId).maybeSingle();
+  if(campaignError||!campaign)throw new DomainError("authorization","Campaign unavailable.","campaign_not_found",false);
+  if(!["researching","strategy"].includes(campaign.status))return false;
+
+  const {data:failed,error:failedError}=await db.from("tasks")
+    .select("id,title,type,attempt_count,max_attempts,error,scheduled_for,locked_at,locked_by,lease_expires_at")
+    .eq("organization_id",organizationId)
+    .eq("campaign_id",campaignId)
+    .eq("status","failed")
+    .in("type",[...CAMPAIGN_STRATEGY_TASK_TYPES])
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(failedError)throw new DomainError("dependency",`No se pudo leer la etapa fallida: ${failedError.code??failedError.message}`,"campaign_failed_stage_read_failed",true);
+  if(!failed)return false;
+
+  const maxAttempts=retryAttemptCeiling(failed.attempt_count,failed.max_attempts);
+  if(maxAttempts===null)throw new DomainError("validation","Esta etapa alcanzó el límite de reintentos manuales.","campaign_retry_limit",false);
+  const {data:requeued,error:requeueError}=await db.from("tasks").update({status:"queued",scheduled_for:new Date().toISOString(),max_attempts:maxAttempts,error:null,locked_at:null,locked_by:null,lease_expires_at:null})
+    .eq("id",failed.id)
+    .eq("organization_id",organizationId)
+    .eq("campaign_id",campaignId)
+    .eq("status","failed")
+    .eq("attempt_count",failed.attempt_count)
+    .select("id")
+    .maybeSingle();
+  if(requeueError)throw new DomainError("dependency",`No se pudo reabrir la etapa: ${requeueError.code??requeueError.message}`,"campaign_failed_stage_requeue_failed",true);
+  if(!requeued)return false;
+
+  const previousError=failed.error as {code?:string}|null;
+  const {error:auditError}=await db.from("activity_log").insert({organization_id:organizationId,campaign_id:campaignId,action:"campaign.stage_retry_requested",actor_type:"user",actor_id:userId,entity_type:"task",entity_id:failed.id,task_id:failed.id,summary:`Reintento solicitado: ${failed.title}`,metadata:{task_type:failed.type,previous_error_code:previousError?.code??null,previous_attempt_count:failed.attempt_count}});
+  if(auditError){
+    // Cron is disabled, so nothing should claim this between the update and the audit. Put it
+    // back if the audit cannot be written rather than creating unaudited work. The status guard
+    // also keeps this rollback from stealing a task another explicit request already claimed.
+    const {error:rollbackError}=await db.from("tasks").update({status:"failed",error:failed.error,scheduled_for:failed.scheduled_for,max_attempts:failed.max_attempts,locked_at:failed.locked_at,locked_by:failed.locked_by,lease_expires_at:failed.lease_expires_at})
+      .eq("id",failed.id).eq("organization_id",organizationId).eq("status","queued").eq("attempt_count",failed.attempt_count);
+    log("error","campaign.stage_retry_audit_failed",{organizationId,taskId:failed.id},{campaignId,code:auditError.code,message:auditError.message,rollbackCode:rollbackError?.code});
+    throw new DomainError("dependency","No se pudo auditar el reintento; la etapa no se reabrió.","campaign_stage_retry_audit_failed",true);
+  }
+  return true;
 }

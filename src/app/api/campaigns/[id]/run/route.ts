@@ -1,5 +1,5 @@
 import { getOrganizationContext } from "@/features/organizations/context";
-import { runCampaignBrainForOrganization, resumeCampaignBrainForOrganization } from "@/server/campaigns/workflow";
+import { requeueFailedCampaignStageForOrganization, runCampaignBrainForOrganization, resumeCampaignBrainForOrganization } from "@/server/campaigns/workflow";
 import { publicError } from "@/server/errors";
 
 // Running Campaign Brain, one bite at a time.
@@ -28,7 +28,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       .eq("organization_id", context.orgId)
       .in("status", ["queued", "running"]);
 
-    const result = count
+    // A terminal provider failure leaves no queued work. Reopen that exact task before deciding
+    // this is a brand-new strategy run; otherwise `researching` has neither a start nor a resume
+    // path and the campaign can only be abandoned.
+    const recovered = count ? false : await requeueFailedCampaignStageForOrganization(context.orgId, id, context.user.id);
+    const result = count || recovered
       ? await resumeCampaignBrainForOrganization(context.orgId, id)
       : await runCampaignBrainForOrganization(context.orgId, id, context.user.id);
 

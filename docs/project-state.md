@@ -172,6 +172,12 @@ never had media. No error, no gap, just an absence that looked like a decision.
 that turned "nobody pressed the button" into "this has hung" and sent two people looking for a
 fault instead of a button.
 
+**A terminal provider failure closed both doors.** The campaign had already moved to
+`researching`, so starting again was rejected; the failed task was no longer queued, so resuming
+found nothing. The campaign page now offers an explicit retry for the failed strategy stage. It
+requeues the same task, preserves every completed predecessor and run record, audits the action,
+and never retries a terminal failure merely because someone opened the page.
+
 ## Where the integrations stand
 
 `Configuración → Integración` exists, with two gates that move independently:
